@@ -292,10 +292,4 @@ docker system prune -a --volumes
 
 MIT License
 
-## 📧 문의
-
-프로젝트 관련 문의: your-email@example.com
-
----
-
 **Made with ❤️ for CDC Pipeline Testing**
