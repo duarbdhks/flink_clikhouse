@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+
+# IDE settings
+.idea/
+.vscode/
+
+# Env/config
+.env
+.env.*
+!.env.example
+
+# Node / front-end
+node_modules/
+dist/
+build/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Logs & temp
+*.log
+logs/
+tmp/
+
+# Docker artifacts
+init-scripts/
+docker-data/
+volumes/
+
