@@ -1,0 +1,232 @@
+version: '3.8'
+
+services:
+  # ========================================
+  # MySQL (Source Database)
+  # ========================================
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    hostname: mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: order_db
+      MYSQL_USER: app_user
+      MYSQL_PASSWORD: app_password
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --binlog-row-image=FULL
+      - --expire-logs-days=7
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init-scripts/init-mysql.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - cdc-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ========================================
+  # Confluent Kafka (KRaft Mode)
+  # ========================================
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      # KRaft 모드 설정
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # 리스너 설정
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # 클러스터 ID
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+      # 로그 디렉토리
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+
+      # 성능 튜닝
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 3
+
+      # 로그 보관 정책
+      KAFKA_LOG_RETENTION_HOURS: 168  # 7일
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824  # 1GB
+
+      # JVM 힙 메모리
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - cdc-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ========================================
+  # ClickHouse (Analytics Database)
+  # ========================================
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    container_name: clickhouse-server
+    hostname: clickhouse
+    ports:
+      - "8123:8123"  # HTTP 인터페이스
+      - "9000:9000"  # Native 클라이언트
+    environment:
+      CLICKHOUSE_DB: order_analytics
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./init-scripts/init-clickhouse.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - cdc-network
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ========================================
+  # Flink JobManager
+  # ========================================
+  flink-jobmanager:
+    image: flink:1.18.0-scala_2.12-java11
+    container_name: flink-jobmanager
+    hostname: flink-jobmanager
+    ports:
+      - "8081:8081"  # Web UI
+    command: jobmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 2
+        state.backend: filesystem
+        state.checkpoints.dir: file:///tmp/flink-checkpoints
+        state.savepoints.dir: file:///tmp/flink-savepoints
+        execution.checkpointing.interval: 60000
+        execution.checkpointing.mode: EXACTLY_ONCE
+    volumes:
+      - flink-checkpoints:/tmp/flink-checkpoints
+      - flink-savepoints:/tmp/flink-savepoints
+      - ./flink-jobs:/opt/flink/jobs
+    networks:
+      - cdc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ========================================
+  # Flink TaskManager
+  # ========================================
+  flink-taskmanager:
+    image: flink:1.18.0-scala_2.12-java11
+    container_name: flink-taskmanager
+    hostname: flink-taskmanager
+    depends_on:
+      - flink-jobmanager
+    command: taskmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        taskmanager.memory.process.size: 1024m
+    volumes:
+      - flink-checkpoints:/tmp/flink-checkpoints
+      - flink-savepoints:/tmp/flink-savepoints
+    networks:
+      - cdc-network
+    scale: 1  # TaskManager 개수 (필요 시 증가)
+
+  # ========================================
+  # NestJS Order Service (Optional)
+  # ========================================
+  # nestjs-api:
+  #   build:
+  #     context: ./order-service
+  #     dockerfile: Dockerfile
+  #   container_name: nestjs-api
+  #   hostname: nestjs-api
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     NODE_ENV: production
+  #     DATABASE_HOST: mysql
+  #     DATABASE_PORT: 3306
+  #     DATABASE_USER: app_user
+  #     DATABASE_PASSWORD: app_password
+  #     DATABASE_NAME: order_db
+  #   depends_on:
+  #     - mysql
+  #   networks:
+  #     - cdc-network
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # ========================================
+  # Kafka UI (Optional - 모니터링용)
+  # ========================================
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - cdc-network
+
+# ========================================
+# Volumes
+# ========================================
+volumes:
+  mysql-data:
+    driver: local
+  kafka-data:
+    driver: local
+  clickhouse-data:
+    driver: local
+  flink-checkpoints:
+    driver: local
+  flink-savepoints:
+    driver: local
+
+# ========================================
+# Networks
+# ========================================
+networks:
+  cdc-network:
+    driver: bridge
