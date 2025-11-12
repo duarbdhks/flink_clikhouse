@@ -37,7 +37,7 @@ User Input (HTML Form)
     ↓
 NestJS REST API (/api/orders)
     ↓
-MySQL INSERT/UPDATE
+MySQL INSERT/UPDATE/DELETE
     ↓
 MySQL Binlog 기록
 ```
