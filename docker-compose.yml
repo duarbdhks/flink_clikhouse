@@ -6,7 +6,7 @@ services:
   mysql:
     image: mysql:8.0
     platform: linux/amd64
-    container_name: mysql
+    container_name: yeumgw-mysql
     hostname: mysql
     ports:
       - "3306:3306"
@@ -64,7 +64,7 @@ services:
   # ========================================
   kafka:
     image: confluentinc/cp-kafka:7.6.0
-    container_name: kafka
+    container_name: yeumgw-kafka
     hostname: kafka
     ports:
       - "9092:9092"
@@ -115,7 +115,7 @@ services:
   # ========================================
   clickhouse:
     image: clickhouse/clickhouse-server:23.8
-    container_name: clickhouse-server
+    container_name: yeumgw-clickhouse-server
     hostname: clickhouse
     ports:
       - "8123:8123"  # HTTP 인터페이스
@@ -123,6 +123,8 @@ services:
     environment:
       CLICKHOUSE_DB: order_analytics
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      CLICKHOUSE_USER: admin
+      CLICKHOUSE_PASSWORD: test123
     volumes:
       - ./volumes/clickhouse:/var/lib/clickhouse
       - ./scripts/sql/init-clickhouse.sql:/docker-entrypoint-initdb.d/init.sql
@@ -143,7 +145,7 @@ services:
   # ========================================
   flink-jobmanager:
     image: flink:1.18.0-scala_2.12-java11
-    container_name: flink-jobmanager
+    container_name: yeumgw-flink-jobmanager
     hostname: flink-jobmanager
     ports:
       - "8081:8081"  # Web UI
@@ -175,7 +177,7 @@ services:
   # ========================================
   flink-taskmanager:
     image: flink:1.18.0-scala_2.12-java11
-    container_name: flink-taskmanager
+    container_name: yeumgw-flink-taskmanager
     hostname: flink-taskmanager
     depends_on:
       - flink-jobmanager
@@ -197,7 +199,7 @@ services:
   # ========================================
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
+    container_name: yeumgw-kafka-ui
     ports:
       - "8080:8080"
     environment:
