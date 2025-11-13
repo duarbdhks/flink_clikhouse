@@ -1,33 +1,60 @@
-version: '3.8'
-
 services:
   # ========================================
-  # MySQL (Source Database)
+  # MySQL (Aurora MySQL 호환 모드)
+  # Aurora MySQL 3.x (MySQL 8.0 호환) 설정
   # ========================================
   mysql:
     image: mysql:8.0
+    platform: linux/amd64
     container_name: mysql
     hostname: mysql
     ports:
       - "3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_ROOT_PASSWORD: test123
       MYSQL_DATABASE: order_db
-      MYSQL_USER: app_user
-      MYSQL_PASSWORD: app_password
+      MYSQL_USER: dev
+      MYSQL_PASSWORD: test123
     command:
+      # Aurora MySQL 호환 설정
       - --server-id=1
       - --log-bin=mysql-bin
       - --binlog-format=ROW
       - --binlog-row-image=FULL
       - --expire-logs-days=7
+
+      # Aurora MySQL 3.x 호환 파라미터
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+      # UTF-8 클라이언트 연결 설정 (한글 깨짐 방지)
+      - --character-set-client-handshake=FALSE
+      - --init-connect=SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+
+      # 성능 최적화 (Aurora 유사)
+      - --innodb-buffer-pool-size=512M
+      - --innodb-log-file-size=256M
+      - --innodb-flush-log-at-trx-commit=2
+      - --innodb-flush-method=O_DIRECT
+      - --max-connections=500
+
+      # CDC 최적화
+      - --binlog-cache-size=32768
+      - --max-binlog-size=512M
+      - --binlog-expire-logs-seconds=604800  # 7일
+
+      # Aurora 호환 트랜잭션 설정
+      - --transaction-isolation=READ-COMMITTED
+      - --innodb-lock-wait-timeout=50
     volumes:
-      - mysql-data:/var/lib/mysql
-      - ./init-scripts/init-mysql.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./volumes/mysql:/var/lib/mysql
+      - ./scripts/sql/init-mysql.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - cdc-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -74,11 +101,11 @@ services:
       # JVM 힙 메모리
       KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
     volumes:
-      - kafka-data:/var/lib/kafka/data
+      - ./volumes/kafka:/var/lib/kafka/data
     networks:
       - cdc-network
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -97,8 +124,8 @@ services:
       CLICKHOUSE_DB: order_analytics
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
-      - clickhouse-data:/var/lib/clickhouse
-      - ./init-scripts/init-clickhouse.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./volumes/clickhouse:/var/lib/clickhouse
+      - ./scripts/sql/init-clickhouse.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - cdc-network
     ulimits:
@@ -106,7 +133,7 @@ services:
         soft: 262144
         hard: 262144
     healthcheck:
-      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      test: [ "CMD", "clickhouse-client", "--query", "SELECT 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -132,13 +159,13 @@ services:
         execution.checkpointing.interval: 60000
         execution.checkpointing.mode: EXACTLY_ONCE
     volumes:
-      - flink-checkpoints:/tmp/flink-checkpoints
-      - flink-savepoints:/tmp/flink-savepoints
+      - ./volumes/flink-checkpoints:/tmp/flink-checkpoints
+      - ./volumes/flink-savepoints:/tmp/flink-savepoints
       - ./flink-jobs:/opt/flink/jobs
     networks:
       - cdc-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8081" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -159,39 +186,11 @@ services:
         taskmanager.numberOfTaskSlots: 4
         taskmanager.memory.process.size: 1024m
     volumes:
-      - flink-checkpoints:/tmp/flink-checkpoints
-      - flink-savepoints:/tmp/flink-savepoints
+      - ./volumes/flink-checkpoints:/tmp/flink-checkpoints
+      - ./volumes/flink-savepoints:/tmp/flink-savepoints
     networks:
       - cdc-network
     scale: 1  # TaskManager 개수 (필요 시 증가)
-
-  # ========================================
-  # NestJS Order Service (Optional)
-  # ========================================
-  # nestjs-api:
-  #   build:
-  #     context: ./order-service
-  #     dockerfile: Dockerfile
-  #   container_name: nestjs-api
-  #   hostname: nestjs-api
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     NODE_ENV: production
-  #     DATABASE_HOST: mysql
-  #     DATABASE_PORT: 3306
-  #     DATABASE_USER: app_user
-  #     DATABASE_PASSWORD: app_password
-  #     DATABASE_NAME: order_db
-  #   depends_on:
-  #     - mysql
-  #   networks:
-  #     - cdc-network
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
 
   # ========================================
   # Kafka UI (Optional - 모니터링용)
@@ -208,21 +207,6 @@ services:
       - kafka
     networks:
       - cdc-network
-
-# ========================================
-# Volumes
-# ========================================
-volumes:
-  mysql-data:
-    driver: local
-  kafka-data:
-    driver: local
-  clickhouse-data:
-    driver: local
-  flink-checkpoints:
-    driver: local
-  flink-savepoints:
-    driver: local
 
 # ========================================
 # Networks
