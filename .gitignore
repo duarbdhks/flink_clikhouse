@@ -27,9 +27,8 @@ logs/
 tmp/
 
 # Docker artifacts
-init-scripts/
-docker-data/
 volumes/
 
-# MCP
-#.serena/
+# MCP & Claude
+.claude/
+.serena/
