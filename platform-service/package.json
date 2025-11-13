@@ -1,7 +1,7 @@
 {
-  "name": "order-service",
+  "name": "platform-service",
   "version": "1.0.0",
-  "description": "Order Service REST API for Flink ClickHouse CDC Pipeline",
+  "description": "Platform Service REST API for Flink ClickHouse CDC Pipeline",
   "author": "Your Name",
   "private": true,
   "license": "MIT",
