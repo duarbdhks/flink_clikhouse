@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>새 주문 생성 - Order Management System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <a href="/" class="logo">📦 Order System</a>
+            <nav>
+                <a href="/dashboard.html">📊 대시보드</a>
+                <a href="/orders.html">➕ 주문 생성</a>
+                <a href="/api/docs" target="_blank">📚 API 문서</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <h1>➕ 새 주문 생성</h1>
+
+        <div class="card">
+            <h3>주문 정보</h3>
+
+            <!-- User ID Section -->
+            <div class="form-group">
+                <label for="userId">사용자 ID *</label>
+                <input type="number" id="userId" placeholder="사용자 ID 입력" min="1" required>
+            </div>
+
+            <!-- Items Section -->
+            <div class="form-group">
+                <label>📦 주문 상품 *</label>
+                <div id="itemsContainer">
+                    <!-- Items will be added here dynamically -->
+                </div>
+                <button type="button" class="btn btn-info" onclick="addItem()" style="margin-top: 10px;">
+                    ➕ 상품 추가
+                </button>
+            </div>
+
+            <!-- Summary Section -->
+            <div class="order-summary">
+                <div class="summary-row">
+                    <span>상품 개수:</span>
+                    <span id="itemCount">0</span>
+                </div>
+                <div class="summary-row">
+                    <span>상품 총액:</span>
+                    <span id="totalAmount">₩0</span>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="form-row full" style="margin-top: 30px;">
+                <button type="button" class="btn btn-success" onclick="submitOrder()" style="flex: 1;">
+                    ✅ 주문 생성
+                </button>
+                <button type="button" class="btn btn-info" onclick="goToDashboard()" style="flex: 1; margin-left: 10px;">
+                    📊 대시보드로
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/orders.js"></script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Management System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="welcome-section">
+            <h1>📦 Order Management System</h1>
+            <p>Flink ClickHouse CDC Pipeline - 주문 관리 시스템</p>
+
+            <div class="button-group">
+                <a href="/dashboard.html" class="btn btn-primary btn-lg">
+                    📊 대시보드 보기
+                </a>
+                <a href="/orders.html" class="btn btn-success btn-lg">
+                    ➕ 새 주문 생성
+                </a>
+                <a href="/api/docs" class="btn btn-info btn-lg" target="_blank">
+                    📚 API 문서
+                </a>
+            </div>
+
+            <div class="info-section">
+                <h2>🎯 주요 기능</h2>
+                <ul>
+                    <li>✅ 주문 생성/조회/수정/취소 (REST API)</li>
+                    <li>✅ 실시간 주문 통계 (대시보드)</li>
+                    <li>✅ Swagger API 문서</li>
+                    <li>✅ MySQL ↔ ClickHouse CDC 동기화</li>
+                </ul>
+
+                <h2>🛠️ 기술 스택</h2>
+                <ul>
+                    <li>🟢 NestJS + TypeORM</li>
+                    <li>🐘 MySQL 8.0</li>
+                    <li>📊 ClickHouse 23.8</li>
+                    <li>🚀 Apache Flink 1.18</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 자동 리다이렉트 (선택사항)
+        // window.location.href = '/dashboard.html';
+    </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>주문 대시보드 - Order Management System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <a href="/" class="logo">📦 Order System</a>
+            <nav>
+                <a href="/dashboard.html">📊 대시보드</a>
+                <a href="/orders.html">➕ 주문 생성</a>
+                <a href="/api/docs" target="_blank">📚 API 문서</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <h1>📊 주문 관리 대시보드</h1>
+
+        <!-- Statistics Section -->
+        <section id="statisticsSection" class="mb-20">
+            <h2>📈 주문 통계</h2>
+            <div class="stats-grid" id="statsGrid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>통계 데이터 로드 중...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filter Section -->
+        <section class="card mb-20">
+            <h3>🔍 필터</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="filterStatus">주문 상태</label>
+                    <select id="filterStatus">
+                        <option value="">전체</option>
+                        <option value="PENDING">대기중</option>
+                        <option value="PROCESSING">처리중</option>
+                        <option value="COMPLETED">완료</option>
+                        <option value="CANCELLED">취소됨</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filterUserId">사용자 ID</label>
+                    <input type="number" id="filterUserId" placeholder="사용자 ID 입력">
+                </div>
+            </div>
+            <div class="form-row full">
+                <button class="btn btn-primary" onclick="applyFilters()">필터 적용</button>
+                <button class="btn btn-info" onclick="resetFilters()" style="margin-left: 10px;">초기화</button>
+            </div>
+        </section>
+
+        <!-- Orders Table Section -->
+        <section class="card">
+            <h3>📋 주문 목록</h3>
+            <div id="ordersContainer">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>주문 데이터 로드 중...</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Action Modal -->
+    <div id="actionModal" class="modal hidden">
+        <div class="modal-content">
+            <h3>주문 상태 변경</h3>
+            <div class="form-group">
+                <label for="newStatus">새 상태</label>
+                <select id="newStatus">
+                    <option value="PROCESSING">처리중</option>
+                    <option value="COMPLETED">완료</option>
+                </select>
+            </div>
+            <div>
+                <button class="btn btn-success" onclick="confirmStatusChange()">확인</button>
+                <button class="btn btn-info" onclick="closeModal()">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>
