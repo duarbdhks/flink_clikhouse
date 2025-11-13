@@ -1,5 +1,5 @@
 {
-  "name": "nestjs-order-api",
+  "name": "order-service",
   "version": "1.0.0",
   "description": "Order Service REST API for Flink ClickHouse CDC Pipeline",
   "author": "Your Name",
