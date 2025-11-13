@@ -1,0 +1,32 @@
+description = 'Flink Sync Job - Kafka to ClickHouse'
+
+dependencies {
+    implementation project(':common')
+
+    // Kafka Connector
+    implementation "org.apache.flink:flink-connector-kafka:${flinkVersion}"
+
+    // ClickHouse JDBC
+    implementation 'com.clickhouse:clickhouse-jdbc:0.4.6'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.14'
+}
+
+application {
+    mainClass = 'com.example.flink.sync.KafkaToClickHouseJob'
+}
+
+// JAR 빌드 설정 (향후 구현 시 사용)
+tasks.register('buildJobJar', Jar) {
+    archiveBaseName = 'flink-sync-job'
+    archiveVersion = project.version
+
+    manifest {
+        attributes 'Main-Class': 'com.example.flink.sync.KafkaToClickHouseJob'
+    }
+
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+
+    with jar
+}

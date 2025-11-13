@@ -1,0 +1,31 @@
+description = 'Flink CDC Job - MySQL to Kafka'
+
+dependencies {
+    implementation project(':common')
+
+    // Flink CDC MySQL Connector
+    implementation "com.ververica:flink-connector-mysql-cdc:${flinkCdcVersion}"
+
+    // Kafka Connector
+    implementation "org.apache.flink:flink-connector-kafka:${flinkVersion}"
+}
+
+application {
+    mainClass = 'com.example.flink.cdc.MySQLCDCJob'
+}
+
+// JAR 빌드 설정 (향후 구현 시 사용)
+tasks.register('buildJobJar', Jar) {
+    archiveBaseName = 'flink-cdc-job'
+    archiveVersion = project.version
+
+    manifest {
+        attributes 'Main-Class': 'com.example.flink.cdc.MySQLCDCJob'
+    }
+
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+
+    with jar
+}

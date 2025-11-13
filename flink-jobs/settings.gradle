@@ -1,0 +1,6 @@
+rootProject.name = 'flink-jobs'
+
+// 멀티 모듈 프로젝트 구성
+include 'common'
+include 'flink-cdc-job'
+include 'flink-sync-job'

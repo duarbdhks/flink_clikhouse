@@ -1,0 +1,5 @@
+description = 'Common models and utilities for Flink jobs'
+
+dependencies {
+    // Add common dependencies here
+}
