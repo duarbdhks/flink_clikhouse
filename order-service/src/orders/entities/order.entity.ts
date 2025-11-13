@@ -5,9 +5,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { OrderItem } from './order-item.entity';
+import { User } from '@/users/entities/user.entity';
 
 export enum OrderStatus {
   PENDING = 'PENDING',
@@ -62,4 +65,9 @@ export class Order {
     eager: true,
   })
   items: OrderItem[];
+
+  @ApiProperty({ description: '주문한 사용자', type: () => User })
+  @ManyToOne(() => User, (user) => user.orders)
+  @JoinColumn({ name: 'user_id' })
+  user: User;
 }

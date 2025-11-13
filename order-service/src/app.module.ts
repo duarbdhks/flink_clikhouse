@@ -6,6 +6,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
 import { OrdersModule } from './orders/orders.module';
+import { UsersModule } from './users/users.module';
+import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -23,6 +25,10 @@ import { OrdersModule } from './orders/orders.module';
     DatabaseModule,
     // 주문 도메인 모듈
     OrdersModule,
+    // 사용자 도메인 모듈
+    UsersModule,
+    // 상품 도메인 모듈
+    ProductsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

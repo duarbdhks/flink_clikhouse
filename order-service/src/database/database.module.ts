@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { OrderItem } from '@/orders/entities/order-item.entity';
 import { Order } from '@/orders/entities/order.entity';
+import { OrderItem } from '@/orders/entities/order-item.entity';
+import { User } from '@/users/entities/user.entity';
+import { Product } from '@/products/entities/product.entity';
 
 @Module({
   imports: [
@@ -15,7 +17,7 @@ import { Order } from '@/orders/entities/order.entity';
         username: configService.get('DB_USERNAME', 'root'),
         password: configService.get('DB_PASSWORD', 'test123'),
         database: configService.get('DB_DATABASE', 'order_db'),
-        entities: [Order, OrderItem],
+        entities: [Order, OrderItem, User, Product],
         synchronize: configService.get('TYPEORM_SYNCHRONIZE', 'false') === 'true',
         logging: configService.get('TYPEORM_LOGGING', 'false') === 'true',
         charset: 'utf8mb4',
