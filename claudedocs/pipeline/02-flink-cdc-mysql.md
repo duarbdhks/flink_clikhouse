@@ -358,7 +358,7 @@ public class MySQLCDCJobSimple {
 
 ## 📊 CDC 이벤트 형식
 
-### Debezium Change Event 구조
+### Flink CDC Change Event 구조
 ```json
 {
   "before": null,
@@ -373,7 +373,7 @@ public class MySQLCDCJobSimple {
     "updated_at": "2025-01-11T10:30:00Z"
   },
   "source": {
-    "version": "1.9.7.Final",
+    "version": "3.0.1",
     "connector": "mysql",
     "name": "mysql-server",
     "ts_ms": 1736592600000,

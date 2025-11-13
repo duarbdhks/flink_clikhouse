@@ -246,7 +246,7 @@ docker exec -it kafka kafka-consumer-groups --reset-offsets \
     "updated_at": "2025-01-11T10:30:00Z"
   },
   "source": {
-    "version": "1.9.7.Final",
+    "version": "3.0.1",
     "connector": "mysql",
     "name": "mysql-server",
     "ts_ms": 1736592600000,
@@ -285,7 +285,7 @@ docker exec -it kafka kafka-consumer-groups --reset-offsets \
     "updated_at": "2025-01-11T11:45:00Z"
   },
   "source": {
-    "version": "1.9.7.Final",
+    "version": "3.0.1",
     "connector": "mysql",
     "name": "mysql-server",
     "ts_ms": 1736596500000,
@@ -315,7 +315,7 @@ docker exec -it kafka kafka-consumer-groups --reset-offsets \
   },
   "after": null,
   "source": {
-    "version": "1.9.7.Final",
+    "version": "3.0.1",
     "connector": "mysql",
     "name": "mysql-server",
     "ts_ms": 1736600100000,

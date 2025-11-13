@@ -62,7 +62,7 @@ MySQL INSERT → ClickHouse INSERT 전체 흐름 확인
 #### 테스트 실행
 ```bash
 # 1. MySQL 초기 카운트 확인
-docker exec -it mysql mysql -u root -proot_password order_db \
+docker exec -it mysql mysql -u root -ptest123 order_db \
   -e "SELECT COUNT(*) AS mysql_count FROM orders"
 
 # 2. ClickHouse 초기 카운트 확인
@@ -70,7 +70,7 @@ docker exec -it clickhouse-server clickhouse-client \
   --query "SELECT COUNT(*) AS ch_count FROM order_analytics.orders_realtime"
 
 # 3. MySQL에 새 주문 삽입
-docker exec -it mysql mysql -u root -proot_password order_db \
+docker exec -it mysql mysql -u root -ptest123 order_db \
   -e "INSERT INTO orders (user_id, product_name, quantity, total_price, status) VALUES (500, 'Test Laptop', 1, 1200.00, 'pending')"
 
 # 4. Kafka에서 CDC 이벤트 확인 (1-2초 대기)
@@ -87,7 +87,7 @@ docker exec -it clickhouse-server clickhouse-client \
   --query "SELECT * FROM order_analytics.orders_realtime WHERE user_id = 500 ORDER BY event_timestamp DESC LIMIT 1"
 
 # 6. 최종 카운트 비교
-docker exec -it mysql mysql -u root -proot_password order_db \
+docker exec -it mysql mysql -u root -ptest123 order_db \
   -e "SELECT COUNT(*) AS mysql_count FROM orders"
 
 docker exec -it clickhouse-server clickhouse-client \
@@ -109,11 +109,11 @@ UPDATE 작업이 ClickHouse에 정상 반영되는지 확인
 #### 테스트 실행
 ```bash
 # 1. 특정 주문 조회
-docker exec -it mysql mysql -u root -proot_password order_db \
+docker exec -it mysql mysql -u root -ptest123 order_db \
   -e "SELECT order_id, status FROM orders WHERE user_id = 500"
 
 # 2. 상태 업데이트 (pending → completed)
-docker exec -it mysql mysql -u root -proot_password order_db \
+docker exec -it mysql mysql -u root -ptest123 order_db \
   -e "UPDATE orders SET status = 'completed' WHERE user_id = 500"
 
 # 3. ClickHouse에서 UPDATE 이벤트 확인 (5초 대기)
@@ -137,7 +137,7 @@ DELETE 작업이 논리적 삭제로 처리되는지 확인
 #### 테스트 실행
 ```bash
 # 1. 주문 삭제
-docker exec -it mysql mysql -u root -proot_password order_db \
+docker exec -it mysql mysql -u root -ptest123 order_db \
   -e "DELETE FROM orders WHERE user_id = 500"
 
 # 2. ClickHouse에서 DELETE 이벤트 확인 (5초 대기)
@@ -165,7 +165,7 @@ START_TIME=$(date +%s)
 
 # 2. 100건의 주문 생성
 for i in {1..100}; do
-  docker exec -it mysql mysql -u root -proot_password order_db \
+  docker exec -it mysql mysql -u root -ptest123 order_db \
     -e "INSERT INTO orders (user_id, product_name, quantity, total_price) VALUES ($((1000+i)), 'Product $i', 1, $((100+i)).00)"
 done
 
@@ -176,7 +176,7 @@ DURATION=$((END_TIME - START_TIME))
 echo "✅ 100건 INSERT 완료 (소요 시간: ${DURATION}초)"
 
 # 4. MySQL 최종 카운트
-MYSQL_COUNT=$(docker exec -it mysql mysql -u root -proot_password order_db \
+MYSQL_COUNT=$(docker exec -it mysql mysql -u root -ptest123 order_db \
   -se "SELECT COUNT(*) FROM orders WHERE user_id >= 1001 AND user_id <= 1100")
 
 # 5. 30초 대기 (파이프라인 처리 시간)
@@ -229,7 +229,7 @@ for i in $(seq 1 $TEST_COUNT); do
   INSERT_START=$(date +%s%3N)  # 밀리초
 
   # 2. 주문 삽입
-  ORDER_ID=$(docker exec -it mysql mysql -u root -proot_password order_db \
+  ORDER_ID=$(docker exec -it mysql mysql -u root -ptest123 order_db \
     -se "INSERT INTO orders (user_id, product_name, quantity, total_price) VALUES ($((2000+i)), 'Latency Test $i', 1, 100.00); SELECT LAST_INSERT_ID();")
 
   # 3. ClickHouse에서 대기 및 확인
@@ -287,7 +287,7 @@ sleep 30
 docker exec -it flink-jobmanager flink list
 
 # 4. MySQL에 새 데이터 삽입
-docker exec -it mysql mysql -u root -proot_password order_db \
+docker exec -it mysql mysql -u root -ptest123 order_db \
   -e "INSERT INTO orders (user_id, product_name, quantity, total_price) VALUES (3000, 'Recovery Test', 1, 100.00)"
 
 # 5. ClickHouse 확인 (10초 대기)
@@ -377,7 +377,7 @@ echo "데이터 정합성 검증 시작"
 echo "=========================================="
 
 # 1. MySQL 전체 카운트
-MYSQL_TOTAL=$(docker exec -it mysql mysql -u root -proot_password order_db \
+MYSQL_TOTAL=$(docker exec -it mysql mysql -u root -ptest123 order_db \
   -se "SELECT COUNT(*) FROM orders")
 
 # 2. ClickHouse 전체 카운트 (DELETE 제외)

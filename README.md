@@ -27,9 +27,9 @@ MySQL 주문 데이터를 실시간으로 ClickHouse에 동기화하는 CDC 기�
 - **ClickHouse Native Sink**: ClickHouse 공식 Flink Connector (JDBC 대비 2배 빠름)
 - **Confluent Kafka 7.6**: KRaft 모드 메시지 큐 (Zookeeper 불필요)
 
-### 애플리케이션 (Optional)
-- **NestJS**: 주문 관리 API
-- **HTML**: 간단한 주문 생성 폼
+### 애플리케이션
+- **NestJS + TypeORM**: 주문 관리 REST API (CRUD 완성)
+- **Swagger**: API 문서 자동 생성
 
 ### 인프라
 - **Docker Compose**: 전체 인프라 통합 관리
@@ -53,59 +53,94 @@ git clone https://github.com/your-repo/flink_clickhouse.git
 cd flink_clickhouse
 ```
 
-### 3. 초기화 스크립트 생성
+### 3. 전체 시스템 초기화 (원스톱)
 ```bash
-# MySQL 초기화 스크립트
-mkdir -p init-scripts
-cp claudedocs/infrastructure/deployment-guide.md init-scripts/README.md
-
-# init-mysql.sql 생성 (deployment-guide.md 참조)
-# init-clickhouse.sql 생성 (deployment-guide.md 참조)
+# 모든 서비스 시작 + DB 초기화 + Kafka Topic 생성
+bash scripts/setup/init-all.sh
 ```
 
-### 4. 전체 인프라 시작
+**OR 수동 초기화**:
 ```bash
-# 모든 서비스 시작
-docker-compose up -d
+# 1. 서비스 시작
+docker-compose up -d mysql clickhouse kafka
 
-# 서비스 상태 확인
-docker-compose ps
+# 2. MySQL 초기화 (orders 테이블 + 샘플 데이터 10건)
+docker exec -i mysql mysql -uroot -ptest123 < scripts/sql/init-mysql.sql
 
-# 로그 확인
-docker-compose logs -f
+# 3. ClickHouse 초기화 (orders_realtime 테이블 + Materialized Views)
+docker exec -i clickhouse clickhouse-client --multiquery < scripts/sql/init-clickhouse.sql
+
+# 4. Kafka Topics 생성
+bash scripts/kafka/create-topics.sh
 ```
 
-### 5. Kafka Topic 생성
+### 4. NestJS API 시작 (Optional)
 ```bash
-docker exec -it kafka kafka-topics --create \
-  --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
-  --partitions 3 \
-  --replication-factor 1
+# NestJS Order Service 시작
+docker-compose up -d nestjs-api
+
+# API 동작 확인
+curl http://localhost:3000/api/health
 ```
 
-### 6. Flink Job 제출
+### 5. Flink Jobs 구현 (향후)
+```bash
+cd flink-jobs
+
+# 프로젝트 빌드
+./gradlew build
+
+# Fat JAR 생성
+./gradlew :flink-cdc-job:buildJobJar
+./gradlew :flink-sync-job:buildJobJar
+```
+
+**현재 상태**: Gradle 구조만 생성됨 (코드 미구현)
+**참고 문서**: `flink-jobs/README.md`, `claudedocs/pipeline/02-flink-cdc-mysql.md`
+
+### 6. Flink Job 제출 (Flink Jobs 구현 후)
 ```bash
 # CDC Job 제출
 docker exec -it flink-jobmanager flink run \
-  -d -c com.example.cdc.MySQLCDCJob \
-  /opt/flink/jobs/mysql-cdc-job.jar
+  -d -c com.example.flink.cdc.MySQLCDCJob \
+  /opt/flink/jobs/flink-cdc-job.jar
 
 # Sync Connector Job 제출
 docker exec -it flink-jobmanager flink run \
-  -d -c com.example.sync.KafkaToClickHouseJob \
-  /opt/flink/jobs/kafka-clickhouse-sync-job.jar
+  -d -c com.example.flink.sync.KafkaToClickHouseJob \
+  /opt/flink/jobs/flink-sync-job.jar
 ```
 
 ### 7. 검증
-```bash
-# MySQL에 테스트 데이터 삽입
-docker exec -it mysql mysql -u root -proot_password order_db \
-  -e "INSERT INTO orders (user_id, product_name, quantity, total_price) VALUES (100, 'Test Product', 1, 50.00)"
 
-# ClickHouse에서 확인 (5초 후)
-docker exec -it clickhouse-server clickhouse-client \
-  --query "SELECT * FROM order_analytics.orders_realtime ORDER BY created_at DESC LIMIT 10"
+#### 방법 1: NestJS API 사용
+```bash
+# 주문 생성 (API 사용)
+curl -X POST http://localhost:3000/api/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": 100,
+    "items": [
+      {"productId": 1001, "productName": "Test Product", "quantity": 1, "price": 50.00}
+    ]
+  }'
+
+# 주문 조회
+curl http://localhost:3000/api/orders
+
+# Swagger API Docs
+open http://localhost:3000/api/docs
+```
+
+#### 방법 2: MySQL 직접 삽입
+```bash
+# MySQL INSERT
+docker exec -it mysql mysql -uroot -ptest123 order_db \
+  -e "INSERT INTO orders (user_id, status, total_amount) VALUES (100, 'PENDING', 50.00)"
+
+# ClickHouse에서 확인 (5초 후, Flink Jobs 실행 시)
+docker exec -it clickhouse clickhouse-client \
+  --query "SELECT * FROM orders_analytics.orders_realtime ORDER BY order_date DESC LIMIT 10"
 ```
 
 ## 📚 문서 구조
@@ -140,6 +175,8 @@ claudedocs/
 ## 🖥️ 모니터링 UI
 
 ### Web 인터페이스
+- **NestJS API**: http://localhost:3000/api
+- **Swagger Docs**: http://localhost:3000/api/docs
 - **Flink Dashboard**: http://localhost:8081
 - **Kafka UI**: http://localhost:8080
 - **ClickHouse Play**: http://localhost:8123/play
@@ -147,7 +184,7 @@ claudedocs/
 ### CLI 접속
 ```bash
 # MySQL 클라이언트
-docker exec -it mysql mysql -u root -proot_password
+docker exec -it mysql mysql -u root -ptest123
 
 # ClickHouse 클라이언트
 docker exec -it clickhouse-server clickhouse-client
@@ -175,7 +212,7 @@ docker exec -it kafka kafka-console-consumer \
 ### 기본 데이터 흐름 테스트
 ```bash
 # 1. MySQL INSERT
-docker exec -it mysql mysql -u root -proot_password order_db \
+docker exec -it mysql mysql -u root -ptest123 order_db \
   -e "INSERT INTO orders (user_id, product_name, quantity, total_price) VALUES (500, 'Laptop', 1, 1500.00)"
 
 # 2. Kafka 확인 (2초 후)
@@ -193,13 +230,13 @@ docker exec -it clickhouse-server clickhouse-client \
 ```bash
 # 100건 삽입
 for i in {1..100}; do
-  docker exec -it mysql mysql -u root -proot_password order_db \
+  docker exec -it mysql mysql -u root -ptest123 order_db \
     -e "INSERT INTO orders (user_id, product_name, quantity, total_price) VALUES ($((1000+i)), 'Product $i', 1, 100.00)"
 done
 
 # 데이터 정합성 검증 (30초 후)
 # MySQL 카운트
-docker exec -it mysql mysql -u root -proot_password order_db \
+docker exec -it mysql mysql -u root -ptest123 order_db \
   -se "SELECT COUNT(*) FROM orders WHERE user_id >= 1001"
 
 # ClickHouse 카운트

@@ -275,7 +275,7 @@ docker exec -it flink-jobmanager flink list
 ### 1. MySQL 데이터 확인
 ```bash
 docker exec -it mysql mysql -u root -p
-# Password: root_password
+# Password: test123
 
 USE order_db;
 SELECT * FROM orders LIMIT 5;
