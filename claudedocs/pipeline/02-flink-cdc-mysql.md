@@ -83,37 +83,64 @@ ON *.* TO 'flink_cdc'@'%';
 FLUSH PRIVILEGES;
 ```
 
-### 3. 주문 데이터베이스 및 테이블 생성
+### 3. 플랫폼 데이터베이스 및 테이블 생성
 ```sql
 CREATE DATABASE IF NOT EXISTS order_db;
 USE order_db;
 
-CREATE TABLE orders (
-    order_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    product_name VARCHAR(255) NOT NULL,
-    quantity INT NOT NULL,
-    total_price DECIMAL(10, 2) NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_user_id (user_id),
-    INDEX idx_status (status),
-    INDEX idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- users 테이블
+CREATE TABLE IF NOT EXISTS users (
+  id         BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '사용자 ID',
+  username   VARCHAR(50)  NOT NULL UNIQUE COMMENT '사용자명 (고유)',
+  email      VARCHAR(100) NOT NULL UNIQUE COMMENT '이메일 (고유)',
+  phone      VARCHAR(20) COMMENT '전화번호',
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '계정 생성 일시',
+  INDEX idx_email (email),
+  INDEX idx_username (username)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-CREATE TABLE order_items (
-    item_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    order_id BIGINT NOT NULL,
-    product_id BIGINT NOT NULL,
-    product_name VARCHAR(255) NOT NULL,
-    quantity INT NOT NULL,
-    unit_price DECIMAL(10, 2) NOT NULL,
-    subtotal DECIMAL(10, 2) NOT NULL,
-    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
-    INDEX idx_order_id (order_id),
-    INDEX idx_product_id (product_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- products 테이블
+CREATE TABLE IF NOT EXISTS products (
+  id          BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '상품 ID',
+  name        VARCHAR(255)   NOT NULL COMMENT '상품명',
+  category    VARCHAR(50) COMMENT '카테고리',
+  price       DECIMAL(10, 2) NOT NULL COMMENT '판매 가격',
+  stock       INT            NOT NULL DEFAULT 0 COMMENT '재고 수량',
+  description TEXT COMMENT '상품 설명',
+  created_at  TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '상품 등록 일시',
+  updated_at  TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '마지막 수정 일시',
+  INDEX idx_category (category),
+  INDEX idx_price (price),
+  INDEX idx_name (name)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- orders 테이블
+CREATE TABLE IF NOT EXISTS orders (
+  id           BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '주문 ID',
+  user_id      BIGINT         NOT NULL COMMENT '사용자 ID',
+  status       VARCHAR(20)    NOT NULL DEFAULT 'PENDING' COMMENT '주문 상태',
+  total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT '총 주문 금액',
+  order_date   TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '주문 생성 일시',
+  updated_at   TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '마지막 수정 일시',
+  INDEX idx_user_id (user_id),
+  INDEX idx_status (status),
+  INDEX idx_order_date (order_date)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- order_items 테이블
+CREATE TABLE IF NOT EXISTS order_items (
+  id           BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '주문 항목 ID',
+  order_id     BIGINT         NOT NULL COMMENT '주문 ID (FK)',
+  product_id   BIGINT         NOT NULL COMMENT '상품 ID',
+  product_name VARCHAR(255)   NOT NULL COMMENT '상품명',
+  quantity     INT            NOT NULL DEFAULT 1 COMMENT '수량',
+  price        DECIMAL(10, 2) NOT NULL COMMENT '단가',
+  subtotal     DECIMAL(10, 2) NOT NULL COMMENT '소계',
+  created_at   TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시',
+  FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
+  INDEX idx_order_id (order_id),
+  INDEX idx_product_id (product_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 ```
 
 ## 🚀 Flink CDC Job 구현
@@ -475,8 +502,13 @@ SHOW BINLOG EVENTS IN 'mysql-bin.000003' LIMIT 10;
 ```sql
 USE order_db;
 
-INSERT INTO orders (user_id, product_name, quantity, total_price, status)
-VALUES (100, 'Test Product', 5, 500.00, 'pending');
+-- 주문 생성 (order_items는 별도로 추가)
+INSERT INTO orders (user_id, status, total_amount, order_date)
+VALUES (101, 'PENDING', 500.00, NOW());
+
+-- 주문 항목 추가
+INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
+VALUES (LAST_INSERT_ID(), 1001, 'Test Product', 5, 100.00, 500.00);
 ```
 
 ### 2. Kafka에서 이벤트 확인

@@ -30,19 +30,36 @@ USE order_analytics;
 CREATE TABLE IF NOT EXISTS orders_realtime (
     order_id UInt64,
     user_id UInt64,
-    product_name String,
-    quantity UInt32,
-    total_price Decimal(10, 2),
     status LowCardinality(String),
-    created_at DateTime,
+    total_amount Decimal(10, 2),
+    order_date DateTime,
     updated_at DateTime,
     operation_type LowCardinality(String),  -- INSERT, UPDATE, DELETE
     event_timestamp UInt64,
     ingestion_time DateTime DEFAULT now()
 )
 ENGINE = ReplacingMergeTree(event_timestamp)
-PARTITION BY toYYYYMM(created_at)
+PARTITION BY toYYYYMM(order_date)
 ORDER BY (order_id, event_timestamp)
+SETTINGS index_granularity = 8192;
+
+-- order_items_realtime 테이블 (주문 항목)
+CREATE TABLE IF NOT EXISTS order_items_realtime (
+    item_id UInt64,
+    order_id UInt64,
+    product_id UInt64,
+    product_name String,
+    quantity UInt32,
+    price Decimal(10, 2),
+    subtotal Decimal(10, 2),
+    created_at DateTime,
+    operation_type LowCardinality(String),
+    event_timestamp UInt64,
+    ingestion_time DateTime DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(event_timestamp)
+PARTITION BY toYYYYMM(created_at)
+ORDER BY (item_id, event_timestamp)
 SETTINGS index_granularity = 8192;
 ```
 
@@ -53,10 +70,18 @@ SETTINGS index_granularity = 8192;
 - **버전 컬럼**: `event_timestamp` (높은 값이 최신)
 - **동작**: OPTIMIZE TABLE 실행 시 중복 제거
 
-**Partition: toYYYYMM(created_at)**
+**Partition: toYYYYMM(order_date)**
 - **월별 파티션**: 2025-01, 2025-02, ...
 - **이점**: 오래된 데이터 삭제 용이 (`ALTER TABLE DROP PARTITION`)
 - **쿼리 최적화**: 특정 월 쿼리 시 해당 파티션만 스캔
+
+**컬럼 구성**:
+- `order_id`: 주문 고유 ID
+- `user_id`: 사용자 ID (users 테이블 참조)
+- `status`: 주문 상태 (PENDING, PROCESSING, COMPLETED, CANCELLED)
+- `total_amount`: 총 주문 금액
+- `order_date`: 주문 생성 일시
+- `updated_at`: 마지막 수정 일시
 
 **Order By: (order_id, event_timestamp)**
 - **Primary Key**: (order_id, event_timestamp)
@@ -77,15 +102,15 @@ PARTITION BY toYYYYMM(order_date)
 ORDER BY (order_date, status)
 AS
 SELECT
-    toDate(created_at) AS order_date,
+    toDate(order_date) AS date,
     status,
     count() AS order_count,
-    sum(total_price) AS daily_revenue,
-    avg(total_price) AS avg_order_value,
+    sum(total_amount) AS daily_revenue,
+    avg(total_amount) AS avg_order_value,
     uniq(user_id) AS unique_customers
 FROM orders_realtime
 WHERE operation_type != 'DELETE'
-GROUP BY order_date, status;
+GROUP BY date, status;
 ```
 
 **특징**:
@@ -102,11 +127,11 @@ PARTITION BY toYYYYMM(order_hour)
 ORDER BY (order_hour, status)
 AS
 SELECT
-    toStartOfHour(created_at) AS order_hour,
+    toStartOfHour(order_date) AS order_hour,
     status,
     countState() AS order_count,
-    sumState(total_price) AS hourly_revenue,
-    avgState(total_price) AS avg_order_value,
+    sumState(total_amount) AS hourly_revenue,
+    avgState(total_amount) AS avg_order_value,
     uniqState(user_id) AS unique_customers
 FROM orders_realtime
 WHERE operation_type != 'DELETE'
@@ -141,11 +166,10 @@ ORDER BY user_id
 AS
 SELECT
     user_id,
-    maxState(created_at) AS last_order_date,
+    maxState(order_date) AS last_order_date,
     countState() AS total_orders,
-    sumState(total_price) AS lifetime_value,
-    avgState(total_price) AS avg_order_value,
-    uniqState(product_name) AS unique_products
+    sumState(total_amount) AS lifetime_value,
+    avgState(total_amount) AS avg_order_value
 FROM orders_realtime
 WHERE operation_type != 'DELETE'
 GROUP BY user_id;
@@ -168,12 +192,12 @@ WHERE user_id = 500;
 ### 1. 실시간 주문 현황 (최근 10분)
 ```sql
 SELECT
-    toStartOfMinute(created_at) AS minute,
+    toStartOfMinute(order_date) AS minute,
     status,
     count() AS order_count,
-    sum(total_price) AS revenue
+    sum(total_amount) AS revenue
 FROM orders_realtime
-WHERE created_at >= now() - INTERVAL 10 MINUTE
+WHERE order_date >= now() - INTERVAL 10 MINUTE
   AND operation_type != 'DELETE'
 GROUP BY minute, status
 ORDER BY minute DESC, status;
@@ -183,24 +207,23 @@ ORDER BY minute DESC, status;
 ```sql
 SELECT
     count() AS total_orders,
-    sum(total_price) AS total_revenue,
-    avg(total_price) AS avg_order_value,
-    uniq(user_id) AS unique_customers,
-    sum(quantity) AS total_items_sold
+    sum(total_amount) AS total_revenue,
+    avg(total_amount) AS avg_order_value,
+    uniq(user_id) AS unique_customers
 FROM orders_realtime
-WHERE toDate(created_at) = today()
+WHERE toDate(order_date) = today()
   AND operation_type != 'DELETE';
 ```
 
-### 3. 상위 10개 상품 (매출 기준)
+### 3. 상위 10개 상품 (매출 기준) - order_items 테이블 사용
 ```sql
 SELECT
     product_name,
     count() AS order_count,
     sum(quantity) AS total_quantity,
-    sum(total_price) AS revenue,
-    avg(total_price) AS avg_price
-FROM orders_realtime
+    sum(subtotal) AS revenue,
+    avg(price) AS avg_price
+FROM order_items_realtime
 WHERE toDate(created_at) = today()
   AND operation_type != 'DELETE'
 GROUP BY product_name
@@ -211,11 +234,11 @@ LIMIT 10;
 ### 4. 시간대별 주문 패턴 (오늘)
 ```sql
 SELECT
-    toHour(created_at) AS hour,
+    toHour(order_date) AS hour,
     count() AS order_count,
-    sum(total_price) AS revenue
+    sum(total_amount) AS revenue
 FROM orders_realtime
-WHERE toDate(created_at) = today()
+WHERE toDate(order_date) = today()
   AND operation_type != 'DELETE'
 GROUP BY hour
 ORDER BY hour;
@@ -226,10 +249,10 @@ ORDER BY hour;
 SELECT
     status,
     count() AS order_count,
-    sum(total_price) AS revenue,
-    (count() * 100.0 / (SELECT count() FROM orders_realtime WHERE toDate(created_at) = today())) AS percentage
+    sum(total_amount) AS revenue,
+    (count() * 100.0 / (SELECT count() FROM orders_realtime WHERE toDate(order_date) = today())) AS percentage
 FROM orders_realtime
-WHERE toDate(created_at) = today()
+WHERE toDate(order_date) = today()
   AND operation_type != 'DELETE'
 GROUP BY status
 ORDER BY order_count DESC;
@@ -240,12 +263,12 @@ ORDER BY order_count DESC;
 ### 1. 월별 매출 트렌드
 ```sql
 SELECT
-    toStartOfMonth(created_at) AS month,
+    toStartOfMonth(order_date) AS month,
     count() AS orders,
-    sum(total_price) AS revenue,
-    avg(total_price) AS aov
+    sum(total_amount) AS revenue,
+    avg(total_amount) AS aov
 FROM orders_realtime
-WHERE created_at >= now() - INTERVAL 6 MONTH
+WHERE order_date >= now() - INTERVAL 6 MONTH
   AND operation_type != 'DELETE'
 GROUP BY month
 ORDER BY month DESC;
@@ -255,10 +278,10 @@ ORDER BY month DESC;
 ```sql
 WITH weekly_data AS (
     SELECT
-        toMonday(created_at) AS week,
-        sum(total_price) AS revenue
+        toMonday(order_date) AS week,
+        sum(total_amount) AS revenue
     FROM orders_realtime
-    WHERE created_at >= now() - INTERVAL 12 WEEK
+    WHERE order_date >= now() - INTERVAL 12 WEEK
       AND operation_type != 'DELETE'
     GROUP BY week
 )
@@ -286,9 +309,9 @@ SELECT
 FROM (
     SELECT
         user_id,
-        dateDiff('day', max(created_at), today()) AS days_since_last_order,
+        dateDiff('day', max(order_date), today()) AS days_since_last_order,
         count() AS total_orders,
-        sum(total_price) AS lifetime_value
+        sum(total_amount) AS lifetime_value
     FROM orders_realtime
     WHERE operation_type != 'DELETE'
     GROUP BY user_id
@@ -297,22 +320,23 @@ GROUP BY segment
 ORDER BY avg_ltv DESC;
 ```
 
-### 4. 상품 재구매율
+### 4. 상품 재구매율 - order_items 테이블 사용
 ```sql
 SELECT
     product_name,
-    count(DISTINCT user_id) AS total_customers,
+    count(DISTINCT oi.user_id) AS total_customers,
     countIf(order_count > 1) AS repeat_customers,
-    (countIf(order_count > 1) * 100.0 / count(DISTINCT user_id)) AS repeat_rate
+    (countIf(order_count > 1) * 100.0 / count(DISTINCT oi.user_id)) AS repeat_rate
 FROM (
     SELECT
-        product_name,
-        user_id,
+        oi.product_name,
+        o.user_id,
         count() AS order_count
-    FROM orders_realtime
-    WHERE operation_type != 'DELETE'
-    GROUP BY product_name, user_id
-)
+    FROM order_items_realtime oi
+    JOIN orders_realtime o ON oi.order_id = o.order_id
+    WHERE oi.operation_type != 'DELETE' AND o.operation_type != 'DELETE'
+    GROUP BY oi.product_name, o.user_id
+) AS subquery
 GROUP BY product_name
 HAVING total_customers >= 10
 ORDER BY repeat_rate DESC
@@ -325,10 +349,10 @@ LIMIT 20;
 ```sql
 WITH daily_revenue AS (
     SELECT
-        toDate(created_at) AS date,
-        sum(total_price) AS revenue
+        toDate(order_date) AS date,
+        sum(total_amount) AS revenue
     FROM orders_realtime
-    WHERE created_at >= now() - INTERVAL 30 DAY
+    WHERE order_date >= now() - INTERVAL 30 DAY
       AND operation_type != 'DELETE'
     GROUP BY date
 )
@@ -343,11 +367,11 @@ ORDER BY date DESC;
 ### 2. 주문량 이동 평균 (7일)
 ```sql
 SELECT
-    toDate(created_at) AS date,
+    toDate(order_date) AS date,
     count() AS daily_orders,
-    avg(count()) OVER (ORDER BY toDate(created_at) ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS moving_avg_7days
+    avg(count()) OVER (ORDER BY toDate(order_date) ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS moving_avg_7days
 FROM orders_realtime
-WHERE created_at >= now() - INTERVAL 30 DAY
+WHERE order_date >= now() - INTERVAL 30 DAY
   AND operation_type != 'DELETE'
 GROUP BY date
 ORDER BY date DESC;
@@ -403,12 +427,21 @@ ORDER BY sum(bytes_on_disk) DESC;
 
 ### 1. 샘플 데이터 삽입
 ```sql
+-- orders 테이블
 INSERT INTO orders_realtime
-(order_id, user_id, product_name, quantity, total_price, status, created_at, updated_at, operation_type, event_timestamp)
+(order_id, user_id, status, total_amount, order_date, updated_at, operation_type, event_timestamp)
 VALUES
-    (1001, 500, 'Laptop', 1, 1500.00, 'pending', now(), now(), 'INSERT', toUnixTimestamp(now())),
-    (1002, 501, 'Mouse', 2, 50.00, 'completed', now(), now(), 'INSERT', toUnixTimestamp(now())),
-    (1003, 502, 'Keyboard', 1, 80.00, 'pending', now(), now(), 'INSERT', toUnixTimestamp(now()));
+    (1001, 101, 'PENDING', 1500.00, now(), now(), 'INSERT', toUnixTimestamp(now())),
+    (1002, 102, 'COMPLETED', 50.00, now(), now(), 'INSERT', toUnixTimestamp(now())),
+    (1003, 103, 'PENDING', 80.00, now(), now(), 'INSERT', toUnixTimestamp(now()));
+
+-- order_items 테이블
+INSERT INTO order_items_realtime
+(item_id, order_id, product_id, product_name, quantity, price, subtotal, created_at, operation_type, event_timestamp)
+VALUES
+    (1, 1001, 1001, 'Laptop', 1, 1500.00, 1500.00, now(), 'INSERT', toUnixTimestamp(now())),
+    (2, 1002, 1002, 'Mouse', 2, 25.00, 50.00, now(), 'INSERT', toUnixTimestamp(now())),
+    (3, 1003, 1003, 'Keyboard', 1, 80.00, 80.00, now(), 'INSERT', toUnixTimestamp(now()));
 ```
 
 ### 2. 데이터 확인

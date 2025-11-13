@@ -30,12 +30,12 @@ async function bootstrap() {
   // Swagger API 문서 설정
   if (process.env.SWAGGER_ENABLED !== 'false') {
     const config = new DocumentBuilder()
-      .setTitle('Order Service API')
-      .setDescription('Flink ClickHouse CDC Pipeline - Order Service REST API')
+      .setTitle('Platform Service API')
+      .setDescription('Flink ClickHouse CDC Pipeline - Platform Service REST API')
       .setVersion('1.0')
       .addTag('orders', '주문 관리 API')
       .addServer('http://localhost:3000', 'Local Development')
-      .addServer('http://nestjs-api:3000', 'Docker Environment')
+      .addServer('http://platform-api:3000', 'Docker Environment')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
@@ -53,7 +53,7 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  console.log(`🚀 Order Service API is running on: http://localhost:${port}/api`);
+  console.log(`🚀 Platform Service API is running on: http://localhost:${port}/api`);
   console.log(`📊 Health Check: http://localhost:${port}/api/health`);
 }
 

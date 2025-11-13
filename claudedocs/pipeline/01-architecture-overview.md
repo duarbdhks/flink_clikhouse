@@ -2,7 +2,7 @@
 
 ## 🎯 프로젝트 목적
 **실시간 CDC 기반 데이터 파이프라인 구축 및 검증**
-- MySQL 주문 데이터를 실시간으로 ClickHouse에 동기화
+- MySQL 플랫폼 데이터를 실시간으로 ClickHouse에 동기화
 - Flink CDC + Kafka + Flink Sync Connector를 활용한 스트리밍 파이프라인
 - Docker Compose 기반 로컬 테스트 환경 구성
 
@@ -10,7 +10,7 @@
 
 ```mermaid
 graph LR
-    User[👤 User<br/>HTML Form] --> NestJS[NestJS<br/>Order Service]
+    User[👤 User<br/>HTML Form] --> NestJS[NestJS<br/>Platform Service]
     NestJS --> MySQL[(MySQL<br/>Source DB)]
 
     MySQL -->|binlog CDC| FlinkCDC[Apache Flink<br/>CDC Job]
@@ -31,7 +31,7 @@ graph LR
 
 ## 🔄 데이터 흐름 상세
 
-### Phase 1: 데이터 생성 (Order Service)
+### Phase 1: 데이터 생성 (Platform Service)
 ```
 User Input (HTML Form)
     ↓
@@ -108,7 +108,11 @@ ClickHouse Query
 - **설정**:
   - binlog 활성화 (`binlog_format=ROW`)
   - CDC 전용 사용자 권한 설정
-- **테이블**: `orders`, `order_items`
+- **테이블**: `users`, `products`, `orders`, `order_items`
+- **ERD**:
+  ```
+  users (1) ──→ orders (N) ←── order_items (N) ←── products (1)
+  ```
 
 ### 2. Apache Flink CDC Job
 - **역할**: MySQL Binlog 실시간 캡처
@@ -143,8 +147,8 @@ ClickHouse Query
   - 실시간 집계 쿼리
   - Materialized View 지원
 
-### 6. NestJS Order Service
-- **역할**: 주문 데이터 생성 API
+### 6. NestJS Platform Service
+- **역할**: 플랫폼 데이터 생성 API
 - **엔드포인트**:
   - `POST /api/orders` - 주문 생성
   - `GET /api/orders` - 주문 조회
@@ -167,7 +171,7 @@ services:
   - flink-jobmanager (Flink Master)
   - flink-taskmanager (Flink Worker)
   - clickhouse (Analytics DB)
-  - nestjs-api (Order Service)
+  - platform-api (Platform Service)
   - nginx (Frontend Static)
 ```
 
@@ -293,7 +297,7 @@ docker exec flink-jobmanager flink run \
 
 3. **애플리케이션 시작**
 ```bash
-docker-compose up -d nestjs-api nginx
+docker-compose up -d platform-api nginx
 ```
 
 4. **검증**

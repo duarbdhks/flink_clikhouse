@@ -1,8 +1,8 @@
-# MVP 주문 서비스 - 실시간 CDC 파이프라인
+# MVP 플랫폼 서비스 - 실시간 CDC 파이프라인
 
 ## 📋 프로젝트 개요
 
-MySQL 주문 데이터를 실시간으로 ClickHouse에 동기화하는 CDC 기반 데이터 파이프라인 MVP
+MySQL 플랫폼 데이터를 실시간으로 ClickHouse에 동기화하는 CDC 기반 데이터 파이프라인 MVP
 
 **핵심 목적**: Flink CDC + Kafka + ClickHouse 연동 구성 테스트
 
@@ -32,7 +32,7 @@ MySQL 주문 데이터를 실시간으로 ClickHouse에 동기화하는 CDC 기�
 
 ### 애플리케이션
 
-- **NestJS + TypeORM**: 주문 관리 REST API (CRUD 완성)
+- **NestJS + TypeORM**: 플랫폼 관리 REST API (CRUD 완성)
 - **Swagger**: API 문서 자동 생성
 
 ### 인프라
@@ -73,8 +73,15 @@ bash scripts/setup/init-all.sh
 # 1. 서비스 시작
 docker-compose up -d mysql clickhouse kafka
 
-# 2. MySQL 초기화 (orders 테이블 + 샘플 데이터 10건)
+# 2. MySQL 초기화 (users, products, orders, order_items 테이블 + 샘플 데이터)
+# 전체 초기화 (모든 테이블 생성 + 샘플 데이터)
 docker exec -i mysql mysql -uroot -ptest123 < scripts/sql/init-mysql.sql
+
+# 또는 개별 실행
+# docker exec -i mysql mysql -uroot -ptest123 < scripts/sql/01-create-users-table.sql
+# docker exec -i mysql mysql -uroot -ptest123 < scripts/sql/02-create-products-table.sql
+# docker exec -i mysql mysql -uroot -ptest123 < scripts/sql/03-seed-users-data.sql
+# docker exec -i mysql mysql -uroot -ptest123 < scripts/sql/04-seed-products-data.sql
 
 # 3. ClickHouse 초기화 (orders_realtime 테이블 + Materialized Views)
 docker exec -i clickhouse clickhouse-client --multiquery < scripts/sql/init-clickhouse.sql
@@ -86,8 +93,8 @@ bash scripts/kafka/create-topics.sh
 ### 4. NestJS API 시작 (Optional)
 
 ```bash
-# NestJS Order Service 시작
-docker-compose up -d nestjs-api
+# NestJS Platform Service 시작
+docker-compose up -d platform-api
 
 # API 동작 확인
 curl http://localhost:3000/api/health
