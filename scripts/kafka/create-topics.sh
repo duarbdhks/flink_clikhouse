@@ -20,7 +20,7 @@ echo -e "${BLUE}=====================================${NC}"
 echo ""
 
 # Kafka 컨테이너 이름
-KAFKA_CONTAINER="kafka"
+KAFKA_CONTAINER="yeumgw-kafka"
 
 # Kafka가 실행 중인지 확인
 if ! docker ps | grep -q "$KAFKA_CONTAINER"; then

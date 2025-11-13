@@ -40,14 +40,14 @@ echo ""
 # 2. 서비스 준비 대기
 echo -e "${BLUE}[2/5] 서비스 준비 대기 (약 30초)${NC}"
 echo -e "${YELLOW}⏳ MySQL 준비 중...${NC}"
-until docker exec mysql mysqladmin ping -h localhost --silent; do
+until docker exec yeumgw-mysql mysqladmin ping -h localhost --silent; do
     echo -n "."
     sleep 2
 done
 echo -e "${GREEN}✅ MySQL 준비 완료${NC}"
 
 echo -e "${YELLOW}⏳ ClickHouse 준비 중...${NC}"
-until docker exec clickhouse clickhouse-client --query "SELECT 1" > /dev/null 2>&1; do
+until docker exec yeumgw-clickhouse-server clickhouse-client --query "SELECT 1" > /dev/null 2>&1; do
     echo -n "."
     sleep 2
 done
@@ -60,7 +60,7 @@ echo ""
 
 # 3. MySQL 초기화
 echo -e "${BLUE}[3/5] MySQL 데이터베이스 초기화${NC}"
-docker exec -i mysql mysql -uroot -prootpass < "${PROJECT_ROOT}/scripts/sql/init-mysql.sql"
+docker exec -i yeumgw-mysql mysql -uroot -ptest123 < "${PROJECT_ROOT}/scripts/sql/init-mysql.sql"
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ MySQL 초기화 완료${NC}"
 else
@@ -71,7 +71,7 @@ echo ""
 
 # 4. ClickHouse 초기화
 echo -e "${BLUE}[4/5] ClickHouse 데이터베이스 초기화${NC}"
-docker exec -i clickhouse clickhouse-client --multiquery < "${PROJECT_ROOT}/scripts/sql/init-clickhouse.sql"
+docker exec -i yeumgw-clickhouse-server clickhouse-client --multiquery < "${PROJECT_ROOT}/scripts/sql/init-clickhouse.sql"
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ ClickHouse 초기화 완료${NC}"
 else
@@ -96,8 +96,8 @@ echo -e "${BLUE}📊 시스템 상태 확인:${NC}"
 echo ""
 
 echo -e "${YELLOW}MySQL 주문 데이터:${NC}"
-docker exec mysql mysql -uroot -prootpass -e "
-USE orders_db;
+docker exec yeumgw-mysql mysql -uroot -ptest123 -e "
+USE order_db;
 SELECT
     status,
     COUNT(*) as order_count,
@@ -109,19 +109,19 @@ ORDER BY status;
 echo ""
 
 echo -e "${YELLOW}ClickHouse 테이블 목록:${NC}"
-docker exec clickhouse clickhouse-client --query "
+docker exec yeumgw-clickhouse-server clickhouse-client --query "
 SELECT
     name AS table_name,
     engine,
     total_rows
 FROM system.tables
-WHERE database = 'orders_analytics'
+WHERE database = 'order_analytics'
 ORDER BY name;
 " --format Pretty
 echo ""
 
 echo -e "${YELLOW}Kafka Topics:${NC}"
-docker exec kafka kafka-topics --bootstrap-server localhost:9092 --list
+docker exec yeumgw-kafka kafka-topics --bootstrap-server localhost:9092 --list
 echo ""
 
 # 다음 단계 안내

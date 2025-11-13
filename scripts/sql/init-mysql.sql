@@ -64,7 +64,16 @@ FLUSH PRIVILEGES;
 
 -- ============================================
 -- 샘플 데이터 삽입 (10개 주문)
+-- 멱등성 보장: 기존 데이터 삭제 후 재삽입
 -- ============================================
+
+-- 기존 샘플 데이터 삭제 (멱등성 보장)
+DELETE FROM order_item WHERE order_id IN (SELECT id FROM orders WHERE user_id IN (101, 102, 103, 104, 105, 106, 107, 108, 109));
+DELETE FROM orders WHERE user_id IN (101, 102, 103, 104, 105, 106, 107, 108, 109);
+
+-- AUTO_INCREMENT 초기화 (선택적)
+ALTER TABLE orders AUTO_INCREMENT = 1;
+ALTER TABLE order_item AUTO_INCREMENT = 1;
 
 -- 주문 1: 전자제품 구매
 INSERT INTO orders (user_id, status, total_amount, order_date)
