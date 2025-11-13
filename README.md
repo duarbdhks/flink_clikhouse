@@ -1,6 +1,7 @@
 # MVP 주문 서비스 - 실시간 CDC 파이프라인
 
 ## 📋 프로젝트 개요
+
 MySQL 주문 데이터를 실시간으로 ClickHouse에 동기화하는 CDC 기반 데이터 파이프라인 MVP
 
 **핵심 목적**: Flink CDC + Kafka + ClickHouse 연동 구성 테스트
@@ -18,25 +19,30 @@ MySQL 주문 데이터를 실시간으로 ClickHouse에 동기화하는 CDC 기�
 ## 🎯 기술 스택
 
 ### 데이터베이스
+
 - **MySQL 8.0**: 주문 데이터 소스 (binlog 활성화)
 - **ClickHouse 23.8**: 실시간 분석용 OLAP 데이터베이스
 
 ### 스트리밍 처리
+
 - **Apache Flink 1.18**: CDC 및 Sync Connector Job
 - **Flink CDC Connector**: MySQL binlog 실시간 캡처 (Debezium 없이 Flink만 사용)
 - **ClickHouse Native Sink**: ClickHouse 공식 Flink Connector (JDBC 대비 2배 빠름)
 - **Confluent Kafka 7.6**: KRaft 모드 메시지 큐 (Zookeeper 불필요)
 
 ### 애플리케이션
+
 - **NestJS + TypeORM**: 주문 관리 REST API (CRUD 완성)
 - **Swagger**: API 문서 자동 생성
 
 ### 인프라
+
 - **Docker Compose**: 전체 인프라 통합 관리
 
 ## 🚀 빠른 시작
 
 ### 1. 사전 요구사항
+
 ```bash
 # Docker 및 Docker Compose 설치 확인
 docker --version        # 20.10.0+
@@ -48,18 +54,21 @@ docker-compose --version  # 1.29.0+
 ```
 
 ### 2. 프로젝트 클론
+
 ```bash
 git clone https://github.com/your-repo/flink_clickhouse.git
 cd flink_clickhouse
 ```
 
 ### 3. 전체 시스템 초기화 (원스톱)
+
 ```bash
 # 모든 서비스 시작 + DB 초기화 + Kafka Topic 생성
 bash scripts/setup/init-all.sh
 ```
 
 **OR 수동 초기화**:
+
 ```bash
 # 1. 서비스 시작
 docker-compose up -d mysql clickhouse kafka
@@ -75,6 +84,7 @@ bash scripts/kafka/create-topics.sh
 ```
 
 ### 4. NestJS API 시작 (Optional)
+
 ```bash
 # NestJS Order Service 시작
 docker-compose up -d nestjs-api
@@ -84,6 +94,7 @@ curl http://localhost:3000/api/health
 ```
 
 ### 5. Flink Jobs 구현 (향후)
+
 ```bash
 cd flink-jobs
 
@@ -99,6 +110,7 @@ cd flink-jobs
 **참고 문서**: `flink-jobs/README.md`, `claudedocs/pipeline/02-flink-cdc-mysql.md`
 
 ### 6. Flink Job 제출 (Flink Jobs 구현 후)
+
 ```bash
 # CDC Job 제출
 docker exec -it flink-jobmanager flink run \
@@ -114,6 +126,7 @@ docker exec -it flink-jobmanager flink run \
 ### 7. 검증
 
 #### 방법 1: NestJS API 사용
+
 ```bash
 # 주문 생성 (API 사용)
 curl -X POST http://localhost:3000/api/orders \
@@ -133,6 +146,7 @@ open http://localhost:3000/api/docs
 ```
 
 #### 방법 2: MySQL 직접 삽입
+
 ```bash
 # MySQL INSERT
 docker exec -it mysql mysql -uroot -ptest123 order_db \
@@ -162,11 +176,13 @@ claudedocs/
 ## 🔍 주요 문서
 
 ### 필수 읽기 (순서대로)
+
 1. **[아키텍처 개요](claudedocs/pipeline/01-architecture-overview.md)** - 전체 구조 이해
 2. **[배포 가이드](claudedocs/infrastructure/deployment-guide.md)** - 인프라 구축
 3. **[E2E 테스트](claudedocs/testing/pipeline-validation.md)** - 검증 방법
 
 ### 상세 설정
+
 4. **[Flink CDC MySQL](claudedocs/pipeline/02-flink-cdc-mysql.md)** - CDC 상세 구성
 5. **[Confluent Kafka](claudedocs/pipeline/03-confluent-kafka.md)** - Kafka 설정
 6. **[Flink Sync Connector](claudedocs/pipeline/04-flink-sync-connector.md)** - ClickHouse 동기화
@@ -175,6 +191,7 @@ claudedocs/
 ## 🖥️ 모니터링 UI
 
 ### Web 인터페이스
+
 - **NestJS API**: http://localhost:3000/api
 - **Swagger Docs**: http://localhost:3000/api/docs
 - **Flink Dashboard**: http://localhost:8081
@@ -182,6 +199,7 @@ claudedocs/
 - **ClickHouse Play**: http://localhost:8123/play
 
 ### CLI 접속
+
 ```bash
 # MySQL 클라이언트
 docker exec -it mysql mysql -u root -ptest123
@@ -199,17 +217,19 @@ docker exec -it kafka kafka-console-consumer \
 ## 📊 성능 메트릭
 
 ### MVP 목표 (소규모 트래픽: 일 100-1,000건)
-| 메트릭 | 목표값 |
-|--------|--------|
-| End-to-End 지연 시간 | < 5초 |
-| 처리량 | 100-1,000 TPS |
-| 데이터 정합성 | 100% |
-| Consumer Lag | < 100 |
-| ClickHouse 쿼리 성능 | < 100ms |
+
+| 메트릭              | 목표값           |
+|------------------|---------------|
+| End-to-End 지연 시간 | < 5초          |
+| 처리량              | 100-1,000 TPS |
+| 데이터 정합성          | 100%          |
+| Consumer Lag     | < 100         |
+| ClickHouse 쿼리 성능 | < 100ms       |
 
 ## 🧪 테스트 실행
 
 ### 기본 데이터 흐름 테스트
+
 ```bash
 # 1. MySQL INSERT
 docker exec -it mysql mysql -u root -ptest123 order_db \
@@ -227,6 +247,7 @@ docker exec -it clickhouse-server clickhouse-client \
 ```
 
 ### 대량 데이터 테스트
+
 ```bash
 # 100건 삽입
 for i in {1..100}; do
@@ -249,6 +270,7 @@ docker exec -it clickhouse-server clickhouse-client \
 ### 일반적인 문제
 
 #### 1. 서비스 시작 실패
+
 ```bash
 # 로그 확인
 docker-compose logs <service-name>
@@ -262,6 +284,7 @@ docker-compose up -d
 ```
 
 #### 2. 데이터 동기화 안 됨
+
 ```bash
 # Flink Job 상태 확인
 docker exec -it flink-jobmanager flink list
@@ -276,6 +299,7 @@ docker exec -it clickhouse-server clickhouse-client --query "SELECT 1"
 ```
 
 #### 3. 포트 충돌
+
 ```bash
 # 포트 사용 확인
 lsof -i :3306   # MySQL
@@ -289,6 +313,7 @@ lsof -i :8123   # ClickHouse
 ## 🛑 중지 및 정리
 
 ### 서비스 중지
+
 ```bash
 # 중지 (데이터 유지)
 docker-compose stop
@@ -301,29 +326,11 @@ docker-compose down -v
 ```
 
 ### 디스크 정리
+
 ```bash
 # 사용하지 않는 리소스 정리
 docker system prune -a --volumes
 ```
-
-## 📈 다음 단계
-
-### MVP 완료 후
-- [ ] **프로덕션 배포**: Kubernetes 환경 마이그레이션
-- [ ] **성능 최적화**: Partition 증가, Batch 튜닝
-- [ ] **모니터링 강화**: Prometheus + Grafana
-- [ ] **고가용성 구성**: Flink HA, Kafka 클러스터
-- [ ] **백업 및 복구**: 데이터 백업 전략 수립
-
-### 추가 기능
-- [ ] **실시간 대시보드**: React + ClickHouse 연동
-- [ ] **알림 시스템**: 이상 탐지 및 알림
-- [ ] **데이터 품질 검증**: dbt 또는 Great Expectations
-- [ ] **ML 파이프라인**: 매출 예측 모델 연동
-
-## 🤝 기여
-
-이 프로젝트는 MVP 테스트 목적으로 제작되었습니다. 개선 사항이나 버그는 Issue를 통해 공유해주세요.
 
 ## 📄 라이선스
 
