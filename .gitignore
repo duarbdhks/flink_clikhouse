@@ -32,3 +32,4 @@ volumes/
 # MCP & Claude
 .claude/
 .serena/
+.playwright-mcp/
