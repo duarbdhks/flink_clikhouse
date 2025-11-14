@@ -4,49 +4,430 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Order Management System</title>
+
+    <!-- Material Icons & Materialize (dashboard/orders와 통일) -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
     <link rel="stylesheet" href="/css/style.css">
+
+    <style>
+        body {
+            background: #F9FAFB;
+            color: #111827;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .hero {
+            padding: 40px 0;
+            flex: 1;
+            display: flex;
+            align-items: center;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: #DBEAFE;
+            border: 1px solid #BFDBFE;
+            font-size: 0.6875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #1D4ED8;
+        }
+
+        .hero-badge i {
+            font-size: 1rem;
+            margin-right: 6px;
+        }
+
+        .hero h1 {
+            font-size: clamp(2rem, 4vw, 2.5rem);
+            font-weight: 700;
+            color: #111827;
+            margin: 18px 0 8px;
+        }
+
+        .hero-subtitle {
+            font-size: 0.9375rem;
+            color: #4B5563;
+            max-width: 480px;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: 3fr 2fr;
+            gap: 40px;
+            align-items: center;
+        }
+
+        .hero-actions {
+            margin-top: 28px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .hero-actions .btn {
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hero-actions .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(156, 163, 175, 0.7);
+            color: #E5E7EB;
+        }
+
+        .hero-actions .btn-outline:hover {
+            background: rgba(15, 23, 42, 0.8);
+        }
+
+        .hero-terminal {
+            background: #ffffff;
+            border-radius: 18px;
+            border: 1px solid #e5e7eb;
+            box-shadow:
+                0 10px 25px rgba(15, 23, 42, 0.08);
+            overflow: hidden;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        .hero-terminal-header {
+            display: flex;
+            align-items: center;
+            padding: 8px 14px;
+            background: #f3f4f6;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .hero-terminal-dots {
+            display: flex;
+            gap: 6px;
+            margin-right: 10px;
+        }
+
+        .hero-terminal-dots span {
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            display: inline-block;
+        }
+
+        .hero-terminal-dots span:nth-child(1) {
+            background: #F87171;
+        }
+
+        .hero-terminal-dots span:nth-child(2) {
+            background: #FBBF24;
+        }
+
+        .hero-terminal-dots span:nth-child(3) {
+            background: #34D399;
+        }
+
+        .hero-terminal-title {
+            font-size: 0.6875rem;
+            color: #6b7280;
+        }
+
+        .hero-terminal-body {
+            padding: 16px 18px 18px;
+            font-size: 0.75rem;
+            line-height: 1.5;
+        }
+
+        .hero-terminal-line {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        .hero-terminal-line span.prompt {
+            color: #60A5FA;
+        }
+
+        .hero-terminal-line span.command {
+            color: #111827;
+        }
+
+        .hero-terminal-line span.comment {
+            color: #6b7280;
+        }
+
+        .hero-terminal-line + .hero-terminal-line {
+            margin-top: 4px;
+        }
+
+        .hero-terminal-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: #e0f2fe;
+            color: #1d4ed8;
+            font-size: 0.625rem;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            margin-top: 10px;
+        }
+
+        /* Features */
+        .features {
+            margin-top: 40px;
+            margin-bottom: 16px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .feature-card {
+            background: #ffffff;
+            border-radius: 14px;
+            padding: 14px 14px 16px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+        }
+
+        .feature-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            background: radial-gradient(circle at 30% 0%, rgba(129, 230, 217, 0.65), transparent 55%),
+                        rgba(15, 23, 42, 1);
+        }
+
+        .feature-icon i {
+            font-size: 1.125rem;
+            color: #A5B4FC;
+        }
+
+        .feature-title {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+
+        .feature-desc {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        /* Footer */
+        .landing-footer {
+            margin-top: auto;
+            padding: 18px 0 22px;
+            border-top: 1px solid #e5e7eb;
+            background: #ffffff;
+        }
+
+        .landing-footer-inner {
+            font-size: 0.6875rem;
+            color: #9CA3AF;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .landing-footer-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            color: #4338ca;
+        }
+
+        .landing-footer-pill i {
+            font-size: 0.875rem;
+        }
+
+        @media (max-width: 992px) {
+            .hero {
+                padding-top: 40px;
+            }
+
+            .hero-grid {
+                grid-template-columns: 1fr;
+                gap: 32px;
+            }
+
+            .hero-terminal {
+                margin-top: 8px;
+            }
+
+            .features-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 600px) {
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <div class="welcome-section">
-            <h1>📦 Order Management System</h1>
-            <p>Flink ClickHouse CDC Pipeline - 주문 관리 시스템</p>
-
-            <div class="button-group">
-                <a href="/dashboard.html" class="btn btn-primary btn-lg">
-                    📊 대시보드 보기
-                </a>
-                <a href="/orders.html" class="btn btn-success btn-lg">
-                    ➕ 새 주문 생성
-                </a>
-                <a href="/api/docs" class="btn btn-info btn-lg" target="_blank">
-                    📚 API 문서
-                </a>
-            </div>
-
-            <div class="info-section">
-                <h2>🎯 주요 기능</h2>
-                <ul>
-                    <li>✅ 주문 생성/조회/수정/취소 (REST API)</li>
-                    <li>✅ 실시간 주문 통계 (대시보드)</li>
-                    <li>✅ Swagger API 문서</li>
-                    <li>✅ MySQL ↔ ClickHouse CDC 동기화</li>
-                </ul>
-
-                <h2>🛠️ 기술 스택</h2>
-                <ul>
-                    <li>🟢 NestJS + TypeORM</li>
-                    <li>🐘 MySQL 8.0</li>
-                    <li>📊 ClickHouse 23.8</li>
-                    <li>🚀 Apache Flink 1.18</li>
-                </ul>
-            </div>
+    <!-- 공통 상단 네비게이션 (대시보드/주문과 동일 계열) -->
+    <nav style="background: #1E3A8A; border-bottom: 1px solid #1E40AF; box-shadow: 0 4px 10px rgba(15,23,42,0.4);">
+        <div class="nav-wrapper container">
+            <a href="/" class="brand-logo" style="display: flex; align-items: center; height: 64px; font-size: 1.25rem; color: #FFFFFF;">
+                <i class="material-icons" style="margin-right: 6px; font-size: 1.5rem;">shopping_cart</i>
+                <span>Order Management</span>
+            </a>
+            <ul class="right hide-on-med-and-down">
+                <li><a href="/dashboard.html" style="color: #FFFFFF;"><i class="material-icons left" style="font-size: 1.125rem;">dashboard</i>대시보드</a></li>
+                <li><a href="/orders.html" style="color: #FFFFFF;"><i class="material-icons left" style="font-size: 1.125rem;">add_shopping_cart</i>주문 생성</a></li>
+                <li><a href="/api/docs" target="_blank" style="color: #FFFFFF;"><i class="material-icons left" style="font-size: 1.125rem;">description</i>API 문서</a></li>
+            </ul>
         </div>
-    </div>
+    </nav>
 
-    <script>
-        // 자동 리다이렉트 (선택사항)
-        // window.location.href = '/dashboard.html';
-    </script>
+    <main class="container hero">
+        <div class="hero-grid">
+            <section>
+                <div class="hero-badge">
+                    <i class="material-icons">bolt</i>
+                    FLINK CDC · CLICKHOUSE PIPELINE
+                </div>
+                <h1>실시간 주문 파이프라인을<br>한 눈에 관리하세요.</h1>
+                <p class="hero-subtitle">
+                    MySQL에서 발생한 주문 데이터를 Apache Flink로 스트리밍 처리하고
+                    ClickHouse에 적재해 시계열 통계까지 한 번에 확인할 수 있는
+                    경량 Order Management 데모입니다.
+                </p>
+
+                <div class="hero-actions">
+                    <a href="/dashboard.html" class="btn blue darken-2" data-testid="go-dashboard">
+                        <i class="material-icons">insights</i>
+                        실시간 대시보드 보기
+                    </a>
+                    <a href="/orders.html" class="btn green darken-2" data-testid="go-orders">
+                        <i class="material-icons">add_shopping_cart</i>
+                        첫 주문 생성하기
+                    </a>
+                    <a href="/api/docs" class="btn btn-outline" target="_blank" data-testid="go-api-docs">
+                        <i class="material-icons" style="font-size: 1.125rem;">description</i>
+                        Swagger API 문서
+                    </a>
+                </div>
+            </section>
+
+            <aside class="hero-terminal" aria-label="Flink CDC 파이프라인 예시 로그">
+                <div class="hero-terminal-header">
+                    <div class="hero-terminal-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <span class="hero-terminal-title">flink-clickhouse-cdc · terminal</span>
+                </div>
+                <div class="hero-terminal-body">
+                    <div class="hero-terminal-line">
+                        <span class="prompt">$</span>
+                        <span class="command">docker compose up -d</span>
+                    </div>
+                    <div class="hero-terminal-line">
+                        <span class="prompt">▶</span>
+                        <span class="comment">MySQL, Kafka, Flink, ClickHouse 컨테이너 기동</span>
+                    </div>
+                    <div class="hero-terminal-line">
+                        <span class="prompt">$</span>
+                        <span class="command">curl -X POST /api/orders</span>
+                    </div>
+                    <div class="hero-terminal-line">
+                        <span class="prompt">▶</span>
+                        <span class="comment">CDC로 주문 이벤트 전파 → 실시간 대시보드 반영</span>
+                    </div>
+
+                    <div class="hero-terminal-badge">
+                        <i class="material-icons" style="font-size: 0.875rem; margin-right: 4px;">schedule</i>
+                        end-to-end latency · &lt; 1s (demo 기준)
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <section class="features">
+            <div class="features-grid">
+                <article class="feature-card">
+                    <div class="feature-icon">
+                        <i class="material-icons">view_quilt</i>
+                    </div>
+                    <div class="feature-title">REST 주문 관리</div>
+                    <div class="feature-desc">
+                        주문 생성·조회·수정·취소를 포함한 기본 CRUD 흐름을
+                        NestJS REST API로 확인할 수 있습니다.
+                    </div>
+                </article>
+
+                <article class="feature-card">
+                    <div class="feature-icon">
+                        <i class="material-icons">timeline</i>
+                    </div>
+                    <div class="feature-title">실시간 대시보드</div>
+                    <div class="feature-desc">
+                        상태별 주문 수, 매출 합계 등 주요 지표를
+                        ClickHouse 시계열 쿼리로 시각화합니다.
+                    </div>
+                </article>
+
+                <article class="feature-card">
+                    <div class="feature-icon">
+                        <i class="material-icons">sync_alt</i>
+                    </div>
+                    <div class="feature-title">MySQL ↔ ClickHouse CDC</div>
+                    <div class="feature-desc">
+                        Flink CDC 커넥터를 통해 OLTP(MySQL)와 OLAP(ClickHouse) 간
+                        변경 데이터를 스트리밍으로 동기화합니다.
+                    </div>
+                </article>
+
+                <article class="feature-card">
+                    <div class="feature-icon">
+                        <i class="material-icons">integration_instructions</i>
+                    </div>
+                    <div class="feature-title">Playwright-friendly UI</div>
+                    <div class="feature-desc">
+                        주요 액션에 <code>data-testid</code>를 부여해
+                        Playwright E2E 시나리오를 쉽게 구성할 수 있습니다.
+                    </div>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <footer class="landing-footer">
+        <div class="container landing-footer-inner">
+            <span>Flink · Kafka · MySQL · ClickHouse · NestJS 샘플 파이프라인</span>
+            <span class="landing-footer-pill">
+                <i class="material-icons">play_arrow</i>
+                playwright-ready · stable selectors
+            </span>
+        </div>
+    </footer>
+
+    <!-- Materialize JS (간단한 컴포넌트용) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 </body>
 </html>

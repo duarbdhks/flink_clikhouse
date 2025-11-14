@@ -4,89 +4,270 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>주문 대시보드 - Order Management System</title>
+
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Materialize CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
     <link rel="stylesheet" href="/css/style.css">
+
+    <style>
+        body {
+            background: #F9FAFB;
+            min-height: 100vh;
+            color: #111827;
+        }
+
+        .card {
+            background: #FFFFFF;
+            color: #111827;
+        }
+
+        .card .card-title {
+            color: #111827;
+            font-weight: 600;
+        }
+
+        .card p,
+        .card label,
+        .card span {
+            color: #111827;
+        }
+
+        .btn span {
+            color: #FFFFFF !important;
+        }
+
+        .stat-card {
+            padding: 20px;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            color: #111827 !important;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+            background: #ffffff;
+        }
+
+        .stat-card .stat-icon {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 48px;
+            opacity: 0.15;
+            color: #93c5fd !important;
+        }
+
+        .stat-card .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 6px 0;
+            color: #fff;
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.8125rem;
+            opacity: 0.95;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #e5d5d5 !important;
+        }
+
+        .order-table-card {
+            overflow-x: auto;
+            border-radius: 16px;
+            border: 1px solid #E5E7EB;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+            background: #FFFFFF;
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .modal {
+            max-width: 500px;
+        }
+
+        nav {
+            background: #1E3A8A !important;
+            border-bottom: 1px solid #1E40AF;
+            box-shadow: 0 4px 10px rgba(15,23,42,0.4);
+        }
+
+        nav ul li a:hover {
+            background: #2563EB !important;
+        }
+
+        /* User select styling */
+        #userSelectContainer .input-field label {
+            font-size: 0.875rem;
+        }
+
+        #userSelectContainer .input-field select {
+            font-size: 0.875rem;
+        }
+
+        #userSelectContainer .select-wrapper input.select-dropdown {
+            font-size: 0.875rem;
+            min-width: 100%;
+        }
+
+        #userSelectContainer .select-dropdown li span {
+            font-size: 0.875rem;
+        }
+    </style>
 </head>
 <body>
-    <header>
-        <div class="container">
-            <a href="/" class="logo">📦 Order System</a>
-            <nav>
-                <a href="/dashboard.html">📊 대시보드</a>
-                <a href="/orders.html">➕ 주문 생성</a>
-                <a href="/api/docs" target="_blank">📚 API 문서</a>
-            </nav>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-wrapper container">
+            <a href="/" class="brand-logo" style="display: flex; align-items: center; height: 64px; font-size: 1.25rem; color: #FFFFFF;">
+                <i class="material-icons" style="margin-right: 6px; color: #FFFFFF; font-size: 1.5rem;">shopping_cart</i>
+                <span>Order Management</span>
+            </a>
+            <ul id="nav-mobile" class="right" style="height: 100%; display: flex; align-items: center;">
+                <li class="active" data-testid="nav-dashboard">
+                    <a href="/dashboard.html" style="display: flex; align-items: center; padding: 0 12px; color: #FFFFFF; height: 100%;">
+                        <i class="material-icons" style="margin-right: 4px; font-size: 1.25rem;">dashboard</i>
+                        <span style="font-size: 0.9rem;">대시보드</span>
+                    </a>
+                </li>
+                <li data-testid="nav-orders">
+                    <a href="/orders.html" style="display: flex; align-items: center; padding: 0 12px; color: #FFFFFF; transition: background 0.3s; height: 100%;">
+                        <i class="material-icons" style="margin-right: 4px; font-size: 1.25rem;">add_shopping_cart</i>
+                        <span style="font-size: 0.9rem;">주문 생성</span>
+                    </a>
+                </li>
+                <li data-testid="nav-api-docs">
+                    <a href="/api/docs" target="_blank" style="display: flex; align-items: center; padding: 0 12px; color: #FFFFFF; transition: background 0.3s; height: 100%;">
+                        <i class="material-icons" style="margin-right: 4px; font-size: 1.25rem;">description</i>
+                        <span style="font-size: 0.9rem;">API 문서</span>
+                    </a>
+                </li>
+            </ul>
         </div>
-    </header>
+    </nav>
 
-    <div class="container">
-        <h1>📊 주문 관리 대시보드</h1>
+    <div class="container" style="margin-top: 24px; margin-bottom: 32px;">
+        <!-- 페이지 제목 -->
+        <h4 style="display: flex; align-items: center; color: #111827; font-weight: 300;">
+            <i class="material-icons left">analytics</i>주문 관리 대시보드
+        </h4>
 
-        <!-- Statistics Section -->
-        <section id="statisticsSection" class="mb-20">
-            <h2>📈 주문 통계</h2>
-            <div class="stats-grid" id="statsGrid">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>통계 데이터 로드 중...</p>
+        <!-- 통계 카드 섹션 -->
+        <section id="statisticsSection" style="margin: 30px 0;" data-testid="stats-section">
+            <div class="row" id="statsGrid">
+                <div class="col s12">
+                    <div class="progress blue lighten-4">
+                        <div class="indeterminate blue"></div>
+                    </div>
+                    <p class="center-align grey-text">통계 데이터 로드 중...</p>
                 </div>
             </div>
         </section>
 
-        <!-- Filter Section -->
-        <section class="card mb-20">
-            <h3>🔍 필터</h3>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="filterStatus">주문 상태</label>
-                    <select id="filterStatus">
-                        <option value="">전체</option>
-                        <option value="PENDING">대기중</option>
-                        <option value="PROCESSING">처리중</option>
-                        <option value="COMPLETED">완료</option>
-                        <option value="CANCELLED">취소됨</option>
-                    </select>
+        <!-- 필터 섹션 -->
+        <section data-testid="filters-section">
+            <div class="card">
+                <div class="card-content">
+                    <span class="card-title">
+                        <i class="material-icons left blue-text">filter_list</i>
+                        필터
+                    </span>
+
+                    <div class="row">
+                        <div class="input-field col s12 m4">
+                            <i class="material-icons prefix">assignment</i>
+                            <select id="filterStatus">
+                                <option value="">전체</option>
+                                <option value="PENDING">대기중</option>
+                                <option value="PROCESSING">처리중</option>
+                                <option value="COMPLETED">완료</option>
+                                <option value="CANCELLED">취소됨</option>
+                            </select>
+                            <label>주문 상태</label>
+                        </div>
+
+                        <div class="col s12 m4" id="userSelectContainer">
+                            <!-- User select will be loaded dynamically -->
+                            <div class="progress blue lighten-4">
+                                <div class="indeterminate blue"></div>
+                            </div>
+                            <p class="center-align grey-text" style="font-size: 0.75rem;">사용자 로드 중...</p>
+                        </div>
+
+                        <div class="input-field col s12 m4">
+                            <i class="material-icons prefix">tag</i>
+                            <input id="filterUserId" type="number" placeholder="사용자 ID 입력">
+                            <label for="filterUserId">또는 사용자 ID 직접 입력</label>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col s12">
+                            <button class="btn waves-effect waves-light blue darken-2" onclick="applyFilters()" style="display: inline-flex; align-items: center;">
+                                <i class="material-icons left" style="margin-right: 4px;">search</i>
+                                <span>필터 적용</span>
+                            </button>
+                            <button class="btn waves-effect waves-light grey" onclick="resetFilters()" style="margin-left: 10px; display: inline-flex; align-items: center;">
+                                <i class="material-icons left" style="margin-right: 4px;">refresh</i>
+                                <span>초기화</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="filterUserId">사용자 ID</label>
-                    <input type="number" id="filterUserId" placeholder="사용자 ID 입력">
-                </div>
-            </div>
-            <div class="form-row full">
-                <button class="btn btn-primary" onclick="applyFilters()">필터 적용</button>
-                <button class="btn btn-info" onclick="resetFilters()" style="margin-left: 10px;">초기화</button>
             </div>
         </section>
 
-        <!-- Orders Table Section -->
-        <section class="card">
-            <h3>📋 주문 목록</h3>
-            <div id="ordersContainer">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>주문 데이터 로드 중...</p>
+        <!-- 주문 목록 섹션 -->
+        <section data-testid="orders-section">
+            <div class="card order-table-card" data-testid="orders-card">
+                <div class="card-content">
+                    <span class="card-title">
+                        <i class="material-icons left green-text">list_alt</i>
+                        주문 목록
+                    </span>
+
+                    <div id="ordersContainer">
+                        <div class="progress blue lighten-4">
+                            <div class="indeterminate blue"></div>
+                        </div>
+                        <p class="center-align grey-text">주문 데이터 로드 중...</p>
+                    </div>
                 </div>
             </div>
         </section>
     </div>
 
-    <!-- Action Modal -->
-    <div id="actionModal" class="modal hidden">
+    <!-- 상태 변경 모달 -->
+    <div id="actionModal" class="modal">
         <div class="modal-content">
-            <h3>주문 상태 변경</h3>
-            <div class="form-group">
-                <label for="newStatus">새 상태</label>
+            <h5><i class="material-icons left blue-text">edit</i>주문 상태 변경</h5>
+            <div class="input-field">
                 <select id="newStatus">
                     <option value="PROCESSING">처리중</option>
                     <option value="COMPLETED">완료</option>
                 </select>
+                <label>새 상태</label>
             </div>
-            <div>
-                <button class="btn btn-success" onclick="confirmStatusChange()">확인</button>
-                <button class="btn btn-info" onclick="closeModal()">취소</button>
-            </div>
+        </div>
+        <div class="modal-footer">
+            <a class="modal-close waves-effect btn blue waves-light btn-flat">취소</a>
+            <a class="waves-effect waves-light btn green darken-1" onclick="confirmStatusChange()">
+                <i class="material-icons left">check</i>확인
+            </a>
         </div>
     </div>
 
+    <!-- Materialize JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/dashboard.js"></script>
 </body>

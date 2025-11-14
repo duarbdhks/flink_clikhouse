@@ -141,6 +141,94 @@ async function getOrderStatistics() {
 }
 
 // ========================================
+// Products API
+// ========================================
+
+/**
+ * 상품 목록 조회
+ */
+async function getProducts(params = {}) {
+    try {
+        const queryString = new URLSearchParams(params).toString();
+        const url = `${API_BASE_URL}/products${queryString ? '?' + queryString : ''}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error fetching products:', error);
+        throw error;
+    }
+}
+
+/**
+ * 상품 상세 조회
+ */
+async function getProductById(id) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/products/${id}`);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error(`Error fetching product ${id}:`, error);
+        throw error;
+    }
+}
+
+// ========================================
+// Users API
+// ========================================
+
+/**
+ * 사용자 목록 조회
+ */
+async function getUsers(params = {}) {
+    try {
+        const queryString = new URLSearchParams(params).toString();
+        const url = `${API_BASE_URL}/users${queryString ? '?' + queryString : ''}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+    }
+}
+
+/**
+ * 사용자 상세 조회
+ */
+async function getUserById(id) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/users/${id}`);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error(`Error fetching user ${id}:`, error);
+        throw error;
+    }
+}
+
+// ========================================
 // Health Check
 // ========================================
 

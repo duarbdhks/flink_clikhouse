@@ -3,13 +3,24 @@
    ======================================== */
 
 :root {
-    --primary-color: #3498db;
+    /* Color palette */
+    --primary-color: #2563EB;       /* Blue-600 */
+    --secondary-color: #1D4ED8;     /* Blue-700 */
+    --accent-color: #60A5FA;        /* Blue-400 */
+    --background-color: #F9FAFB;    /* Gray-50 */
+    --surface-color: #FFFFFF;
+    --text-color: #111827;          /* Gray-900 */
+    --nav-bg-color: #1E3A8A;        /* Blue-900 */
+    --nav-border-color: #1E40AF;
+
+    /* 기존 이름과의 호환 */
+    --primary-color-legacy: var(--primary-color);
     --success-color: #27ae60;
     --danger-color: #e74c3c;
     --warning-color: #f39c12;
-    --info-color: #2980b9;
-    --light-bg: #ecf0f1;
-    --dark-text: #2c3e50;
+    --info-color: #2563EB;
+    --light-bg: var(--background-color);
+    --dark-text: var(--text-color);
     --border-color: #bdc3c7;
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -28,7 +39,7 @@ html, body {
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: var(--dark-text);
-    background-color: var(--light-bg);
+    background-color: var(--background-color);
     line-height: 1.6;
 }
 
@@ -39,7 +50,8 @@ body {
 .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 0;
+    width: 100%;
 }
 
 /* ========================================
@@ -62,7 +74,7 @@ header .container {
 }
 
 .logo {
-    font-size: 24px;
+    font-size: 1.5rem;
     font-weight: bold;
     color: var(--primary-color);
     text-decoration: none;
@@ -71,6 +83,11 @@ header .container {
 nav {
     display: flex;
     gap: 20px;
+}
+
+nav .brand-logo {
+    left: 0;
+    transform: none;
 }
 
 nav a {
@@ -95,14 +112,14 @@ nav a:hover {
 }
 
 .welcome-section h1 {
-    font-size: 48px;
+    font-size: 3rem;
     margin-bottom: 10px;
     color: var(--primary-color);
 }
 
 .welcome-section > p {
-    font-size: 20px;
-    color: #666;
+    font-size: 1.25rem;
+    color: #5f6a6a;
     margin-bottom: 40px;
 }
 
@@ -112,15 +129,21 @@ nav a:hover {
 
 .btn {
     display: inline-block;
-    padding: 10px 20px;
+    padding: 0 20px;
     border-radius: 4px;
     text-decoration: none;
     cursor: pointer;
     border: none;
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 600;
     transition: all 0.3s ease;
     text-align: center;
+    color: #ffffff;
+}
+
+.btn:focus-visible {
+    outline: 3px solid rgba(0, 0, 0, 0.35);
+    outline-offset: 2px;
 }
 
 .btn:hover {
@@ -175,13 +198,13 @@ nav a:hover {
 
 .btn-lg {
     padding: 15px 30px;
-    font-size: 16px;
+    font-size: 1rem;
     margin: 10px;
 }
 
 .btn-sm {
     padding: 6px 12px;
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .button-group {
@@ -199,7 +222,7 @@ nav a:hover {
 }
 
 .info-section h2 {
-    font-size: 20px;
+    font-size: 1.25rem;
     margin-top: 30px;
     margin-bottom: 15px;
     color: var(--primary-color);
@@ -224,7 +247,7 @@ nav a:hover {
     left: 0;
     color: var(--primary-color);
     font-weight: bold;
-    font-size: 20px;
+    font-size: 1.25rem;
 }
 
 /* ========================================
@@ -249,7 +272,7 @@ textarea {
     padding: 10px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    font-size: 14px;
+    font-size: 0.875rem;
     font-family: inherit;
     transition: border-color 0.3s ease;
 }
@@ -299,10 +322,16 @@ textarea:focus {
 
 .card-subtitle {
     color: #666;
-    font-size: 14px;
+    font-size: 0.875rem;
     margin-bottom: 15px;
 }
 
+.card .card-content .card-title {
+    font-size: 1.25rem;
+}
+.card .card-content p {
+    font-size: 0.875rem;
+}
 /* ========================================
    Tables
    ======================================== */
@@ -341,7 +370,7 @@ tr:last-child td {
     display: inline-block;
     padding: 6px 12px;
     border-radius: 20px;
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
 }
@@ -398,7 +427,7 @@ tr:last-child td {
 }
 
 .stat-label {
-    font-size: 12px;
+    font-size: 0.75rem;
     color: #999;
     text-transform: uppercase;
     margin-bottom: 10px;
@@ -406,7 +435,7 @@ tr:last-child td {
 }
 
 .stat-value {
-    font-size: 32px;
+    font-size: 2rem;
     font-weight: bold;
     color: var(--primary-color);
 }
@@ -494,7 +523,7 @@ tr:last-child td {
 }
 
 .empty-state h3 {
-    font-size: 20px;
+    font-size: 1.25rem;
     margin-bottom: 10px;
 }
 
@@ -512,7 +541,7 @@ tr:last-child td {
     }
 
     table {
-        font-size: 12px;
+        font-size: 0.75rem;
     }
 
     th,

@@ -3,68 +3,247 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>새 주문 생성 - Order Management System</title>
+    <title>주문 생성 - Order Management System</title>
+
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Materialize CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
     <link rel="stylesheet" href="/css/style.css">
+
+    <style>
+        body {
+            background: #F9FAFB;
+            min-height: 100vh;
+        }
+
+        .product-card {
+            cursor: pointer;
+            transition: all 0.3s;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+
+        .product-card .card-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .product-card .card-action {
+            margin-top: auto;
+            font-size: 0.8rem;
+        }
+
+        .product-image {
+            height: 200px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #0d47a1 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 48px;
+        }
+
+        .cart-sidebar {
+            position: sticky;
+            top: 20px;
+        }
+
+        .cart-item {
+            border-bottom: 1px solid #e0e0e0;
+            padding: 10px 0;
+        }
+
+        .cart-total {
+            background: #FFFFFF;
+            color: #111827;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        .category-chip {
+            margin: 5px;
+        }
+
+        /* 상품 카드 높이 통일 */
+        #productsGrid .col {
+            display: flex;
+        }
+
+        nav {
+            background: #1E3A8A !important;
+            border-bottom: 1px solid #1E40AF;
+            box-shadow: 0 4px 10px rgba(15,23,42,0.4);
+        }
+</style>
 </head>
 <body>
-    <header>
-        <div class="container">
-            <a href="/" class="logo">📦 Order System</a>
-            <nav>
-                <a href="/dashboard.html">📊 대시보드</a>
-                <a href="/orders.html">➕ 주문 생성</a>
-                <a href="/api/docs" target="_blank">📚 API 문서</a>
-            </nav>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-wrapper container">
+            <a href="/" class="brand-logo" style="display: flex; align-items: center; height: 64px; font-size: 1.25rem; color: #FFFFFF; line-height: 1;">
+                <i class="material-icons" style="margin-right: 6px; color: #FFFFFF; font-size: 1.5rem;">shopping_cart</i>
+                <span style="line-height: 1;">Order Management</span>
+            </a>
+            <ul id="nav-mobile" class="right" style="height: 100%; display: flex; align-items: center;">
+                <li data-testid="nav-dashboard">
+                    <a href="/dashboard.html" style="display: flex; align-items: center; padding: 0 12px; color: #FFFFFF; transition: background 0.3s; height: 100%;">
+                        <i class="material-icons" style="margin-right: 4px; font-size: 1.25rem;">dashboard</i>
+                        <span style="font-size: 0.9rem;">대시보드</span>
+                    </a>
+                </li>
+                <li class="active" data-testid="nav-orders">
+                    <a href="/orders.html" style="display: flex; align-items: center; padding: 0 12px; color: #FFFFFF; height: 100%;">
+                        <i class="material-icons" style="margin-right: 4px; font-size: 1.25rem;">add_shopping_cart</i>
+                        <span style="font-size: 0.9rem;">주문 생성</span>
+                    </a>
+                </li>
+                <li data-testid="nav-api-docs">
+                    <a href="/api/docs" target="_blank" style="display: flex; align-items: center; padding: 0 12px; color: #FFFFFF; transition: background 0.3s; height: 100%;">
+                        <i class="material-icons" style="margin-right: 4px; font-size: 1.25rem;">description</i>
+                        <span style="font-size: 0.9rem;">API 문서</span>
+                    </a>
+                </li>
+            </ul>
         </div>
-    </header>
+    </nav>
 
-    <div class="container">
-        <h1>➕ 새 주문 생성</h1>
+    <style>
+        nav ul li a:hover {
+            background: #2563EB !important;
+        }
 
-        <div class="card">
-            <h3>주문 정보</h3>
+        /* User select styling */
+        #userIdContainer .input-field label {
+            font-size: 0.875rem;
+        }
 
-            <!-- User ID Section -->
-            <div class="form-group">
-                <label for="userId">사용자 ID *</label>
-                <input type="number" id="userId" placeholder="사용자 ID 입력" min="1" required>
+        #userIdContainer .input-field select {
+            font-size: 0.875rem;
+        }
+
+        #userIdContainer .select-wrapper input.select-dropdown {
+            font-size: 0.875rem;
+            min-width: 100%;
+        }
+
+        #userIdContainer .select-dropdown li span {
+            font-size: 0.875rem;
+        }
+    </style>
+
+    <div class="container" style="margin-top: 24px; margin-bottom: 32px; max-width: 1400px;" data-testid="orders-page">
+        <div class="row">
+            <!-- 상품 목록 (65%) -->
+            <div class="col s12 m7 l8">
+                <div class="card" style="border-radius: 16px; border: 1px solid #e5e7eb; background: #ffffff; box-shadow: 0 10px 24px rgba(15,23,42,0.08);" data-testid="products-card">
+                    <div class="card-content">
+                        <span class="card-title">
+                            <i class="material-icons left blue-text">store</i>
+                            상품 목록
+                        </span>
+
+                        <!-- 카테고리 필터 -->
+                        <div class="row" data-testid="category-filter">
+                            <div class="col s12">
+                                <div class="chip category-chip" onclick="filterCategory('all')">
+                                    <i class="material-icons tiny">all_inclusive</i> 전체
+                                </div>
+                                <div class="chip category-chip" onclick="filterCategory('electronics')">
+                                    <i class="material-icons tiny">computer</i> 전자제품
+                                </div>
+                                <div class="chip category-chip" onclick="filterCategory('fashion')">
+                                    <i class="material-icons tiny">shopping_bag</i> 패션
+                                </div>
+                                <div class="chip category-chip" onclick="filterCategory('food')">
+                                    <i class="material-icons tiny">restaurant</i> 식품
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 상품 그리드 -->
+                        <div class="row" id="productsGrid" data-testid="products-grid">
+                            <!-- Products will be loaded dynamically -->
+                            <div class="col s12">
+                                <div class="progress blue lighten-4">
+                                    <div class="indeterminate blue"></div>
+                                </div>
+                                <p class="center-align grey-text">상품 로드 중...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Items Section -->
-            <div class="form-group">
-                <label>📦 주문 상품 *</label>
-                <div id="itemsContainer">
-                    <!-- Items will be added here dynamically -->
-                </div>
-                <button type="button" class="btn btn-info" onclick="addItem()" style="margin-top: 10px;">
-                    ➕ 상품 추가
-                </button>
-            </div>
+            <!-- 장바구니 & 주문 사이드바 (35%) -->
+            <div class="col s12 m5 l4">
+                <div class="cart-sidebar">
+                    <div class="card" style="border-radius: 16px; border: 1px solid #e5e7eb; background: #ffffff; box-shadow: 0 10px 24px rgba(15,23,42,0.08);" data-testid="cart-card">
+                        <div class="card-content">
+                            <span class="card-title">
+                                <i class="material-icons left green-text">shopping_basket</i>
+                                장바구니
+                            </span>
 
-            <!-- Summary Section -->
-            <div class="order-summary">
-                <div class="summary-row">
-                    <span>상품 개수:</span>
-                    <span id="itemCount">0</span>
-                </div>
-                <div class="summary-row">
-                    <span>상품 총액:</span>
-                    <span id="totalAmount">₩0</span>
-                </div>
-            </div>
+                            <!-- 사용자 선택 -->
+                            <div id="userIdContainer">
+                                <!-- User select will be loaded dynamically -->
+                                <div class="progress blue lighten-4">
+                                    <div class="indeterminate blue"></div>
+                                </div>
+                                <p class="center-align grey-text" style="font-size: 0.75rem;">사용자 로드 중...</p>
+                            </div>
 
-            <!-- Action Buttons -->
-            <div class="form-row full" style="margin-top: 30px;">
-                <button type="button" class="btn btn-success" onclick="submitOrder()" style="flex: 1;">
-                    ✅ 주문 생성
-                </button>
-                <button type="button" class="btn btn-info" onclick="goToDashboard()" style="flex: 1; margin-left: 10px;">
-                    📊 대시보드로
-                </button>
+                            <!-- 장바구니 아이템 목록 -->
+                            <div id="cartItems" data-testid="cart-items">
+                                <div class="center-align grey-text" style="padding: 30px 0;">
+                                    <i class="material-icons" style="font-size: 48px;">shopping_cart</i>
+                                    <p>장바구니가 비어있습니다</p>
+                                </div>
+                            </div>
+
+                            <!-- 장바구니 합계 -->
+                            <div class="cart-total" data-testid="cart-total">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-size: 1.125rem;">총 상품 수:</span>
+                                    <span style="font-size: 1.5rem; font-weight: bold;" id="totalItems">0</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                                    <span style="font-size: 1.125rem;">총 금액:</span>
+                                    <span style="font-size: 1.5rem; font-weight: bold;" id="totalAmount">₩0</span>
+                                </div>
+                            </div>
+
+                            <!-- 주문 버튼 -->
+                            <div style="margin-top: 20px;">
+                                <button class="btn waves-effect waves-light green darken-1 btn-large" style="width: 100%; display: flex; align-items: center; justify-content: center;" onclick="submitOrder()" data-testid="submit-order-button">
+                                    <i class="material-icons left" style="margin-right: 8px; line-height: 1;">check_circle</i>
+                                    <span style="line-height: 1;">주문하기</span>
+                                </button>
+                                <button class="btn waves-effect waves-light red lighten-1 btn-large" style="width: 100%; margin-top: 10px; display: flex; align-items: center; justify-content: center;" onclick="clearCart()" data-testid="clear-cart-button">
+                                    <i class="material-icons left" style="margin-right: 8px; line-height: 1;">delete</i>
+                                    <span style="line-height: 1;">장바구니 비우기</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Materialize JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/orders.js"></script>
 </body>
