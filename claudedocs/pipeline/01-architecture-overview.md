@@ -116,11 +116,12 @@ ClickHouse Query
 
 ### 2. Apache Flink CDC Job
 - **역할**: MySQL Binlog 실시간 캡처
-- **Connector**: flink-connector-mysql-cdc
+- **Connector**: flink-connector-mysql-cdc 3.0.1 (Debezium 기반)
 - **기능**:
   - Full Snapshot + Incremental Sync
   - Schema Evolution 지원
   - Exactly-once 처리 보장
+- **특징**: 내부적으로 Debezium 엔진을 사용하여 MySQL Binlog를 캡처
 
 ### 3. Confluent Kafka (KRaft Mode)
 - **역할**: CDC 이벤트 스트림 버퍼링

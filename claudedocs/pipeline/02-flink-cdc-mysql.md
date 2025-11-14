@@ -3,11 +3,13 @@
 ## 📋 개요
 MySQL Binlog를 실시간으로 캡처하여 Kafka로 전송하는 Flink CDC Job 구성 가이드
 
+**Flink CDC Connector 3.0.1**은 내부적으로 **Debezium 엔진**을 사용하여 MySQL Binlog를 실시간으로 캡처합니다.
+
 ## 🎯 구성 요소
 ```
 MySQL (binlog enabled)
     ↓
-Flink CDC Connector
+Flink CDC Connector 3.0.1 (Debezium 기반)
     ↓
 Kafka Topic (orders-cdc-topic)
 ```
@@ -24,7 +26,7 @@ Kafka Topic (orders-cdc-topic)
         <version>1.18.0</version>
     </dependency>
 
-    <!-- Flink CDC MySQL Connector -->
+    <!-- Flink CDC MySQL Connector (Debezium 기반) -->
     <dependency>
         <groupId>com.ververica</groupId>
         <artifactId>flink-connector-mysql-cdc</artifactId>

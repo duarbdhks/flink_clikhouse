@@ -26,7 +26,7 @@ MySQL 플랫폼 데이터를 실시간으로 ClickHouse에 동기화하는 CDC �
 ### 스트리밍 처리
 
 - **Apache Flink 1.18**: CDC 및 Sync Connector Job
-- **Flink CDC Connector**: MySQL binlog 실시간 캡처 (Debezium 없이 Flink만 사용)
+- **Flink CDC Connector 3.0.1**: MySQL binlog 실시간 캡처 (Debezium 기반)
 - **ClickHouse Native Sink**: ClickHouse 공식 Flink Connector (JDBC 대비 2배 빠름)
 - **Confluent Kafka 7.6**: KRaft 모드 메시지 큐 (Zookeeper 불필요)
 
