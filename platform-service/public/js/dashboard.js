@@ -251,7 +251,7 @@ function displayOrders(orders) {
                     </span>
                 </td>
                 <td><strong>${formatCurrency(order.totalAmount)}</strong></td>
-                <td><i class="material-icons tiny">schedule</i> ${formatDate(order.orderDate)}</td>
+                <td><i class="material-icons tiny">schedule</i> ${formatDate(order.createdAt)}</td>
                 <td><span class="badge blue white-text">${itemCount}</span></td>
                 <td>
                     <a class="btn-small waves-effect waves-light blue darken-1" onclick="viewOrderDetails(${order.id})">
@@ -373,7 +373,7 @@ async function viewOrderDetails(orderId) {
                 </li>
                 <li class="collection-item">
                     <i class="material-icons left tiny blue-text">schedule</i>
-                    <strong>주문일시:</strong> ${formatDate(order.orderDate)}
+                    <strong>주문일시:</strong> ${formatDate(order.createdAt)}
                 </li>
             </ul>
 

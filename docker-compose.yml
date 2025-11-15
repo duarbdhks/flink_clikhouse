@@ -151,10 +151,12 @@ services:
       - "8081:8081"  # Web UI
     command: jobmanager
     environment:
+      TZ: UTC
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 4
         parallelism.default: 2
+        table.local-time-zone: UTC
         state.backend: filesystem
         state.checkpoints.dir: file:///tmp/flink-checkpoints
         state.savepoints.dir: file:///tmp/flink-savepoints
@@ -183,9 +185,11 @@ services:
       - flink-jobmanager
     command: taskmanager
     environment:
+      TZ: UTC
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 4
+        table.local-time-zone: UTC
         taskmanager.memory.process.size: 1024m
     volumes:
       - ./volumes/flink-checkpoints:/tmp/flink-checkpoints

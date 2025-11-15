@@ -59,7 +59,7 @@ export class OrdersService {
     const queryBuilder = this.orderRepository
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.items', 'items')
-      .orderBy('order.orderDate', 'DESC');
+      .orderBy('order.createdAt', 'DESC');
 
     // 필터 적용
     if (status) {
