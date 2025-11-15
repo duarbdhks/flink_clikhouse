@@ -128,7 +128,7 @@ docker exec -it yeumgw-kafka kafka-console-consumer \
 
 # 4. ClickHouse 확인 (5초 후)
 docker exec -it yeumgw-clickhouse-server clickhouse-client \
-  --query "SELECT * FROM order_analytics.orders_realtime ORDER BY order_date DESC LIMIT 5"
+  --query "SELECT * FROM order_analytics.orders_realtime ORDER BY created_at DESC LIMIT 5"
 ```
 
 ### 모니터링

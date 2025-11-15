@@ -161,7 +161,7 @@ docker exec -it mysql mysql -uroot -ptest123 order_db \
 
 # ClickHouse에서 확인 (5초 후, Flink Jobs 실행 시)
 docker exec -it clickhouse clickhouse-client \
-  --query "SELECT * FROM orders_analytics.orders_realtime ORDER BY order_date DESC LIMIT 10"
+  --query "SELECT * FROM orders_analytics.orders_realtime ORDER BY created_at DESC LIMIT 10"
 ```
 
 ## 📚 문서 구조
