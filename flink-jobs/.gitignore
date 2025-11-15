@@ -25,3 +25,8 @@ bin/
 
 # Logs
 *.log
+
+# JAR files (except Gradle wrapper)
+jars/
+*.jar
+!gradle/wrapper/*.jar
