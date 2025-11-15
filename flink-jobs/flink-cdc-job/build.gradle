@@ -1,3 +1,9 @@
+plugins {
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'checkstyle'
+}
+
+version = '1.0.0'
 description = 'Flink CDC Job - MySQL to Kafka'
 
 dependencies {
@@ -6,26 +12,82 @@ dependencies {
     // Flink CDC MySQL Connector
     implementation "com.ververica:flink-connector-mysql-cdc:${flinkCdcVersion}"
 
-    // Kafka Connector
-    implementation "org.apache.flink:flink-connector-kafka:${flinkVersion}"
+    // Kafka Connector (Flink 1.18 호환 버전)
+    implementation "org.apache.flink:flink-connector-kafka:3.0.2-1.18"
+
+    // Connector Base (DeliveryGuarantee 등)
+    implementation "org.apache.flink:flink-connector-base:1.18.0"
+
+    // MySQL JDBC Driver
+    implementation 'com.mysql:mysql-connector-j:8.0.33'
+
+    // Jackson for JSON serialization
+    implementation "com.fasterxml.jackson.core:jackson-databind:2.15.0"
+    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.0"
 }
 
 application {
-    mainClass = 'com.example.flink.cdc.MySQLCDCJob'
+    mainClass = 'com.flink.cdc.job.MySQLCDCJob'
 }
 
-// JAR 빌드 설정 (향후 구현 시 사용)
-tasks.register('buildJobJar', Jar) {
+// Shadow JAR 빌드 설정 (모든 의존성 포함)
+shadowJar {
     archiveBaseName = 'flink-cdc-job'
+    archiveClassifier = ''
     archiveVersion = project.version
 
     manifest {
-        attributes 'Main-Class': 'com.example.flink.cdc.MySQLCDCJob'
+        attributes 'Main-Class': 'com.flink.cdc.job.MySQLCDCJob'
     }
 
-    from {
-        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    // Flink 기본 라이브러리 제외 (클러스터에 이미 존재)
+    dependencies {
+        exclude(dependency('org.apache.flink:flink-runtime'))
+        exclude(dependency('org.apache.flink:flink-streaming-java'))
+        exclude(dependency('org.apache.flink:flink-core'))
     }
 
-    with jar
+    mergeServiceFiles()
+}
+
+// Checkstyle 설정
+checkstyle {
+    toolVersion = '10.12.0'
+    configFile = file("${rootProject.projectDir}/config/checkstyle/checkstyle.xml")
+    ignoreFailures = true  // 일시적으로 경고만 표시
+    maxWarnings = 100
+    showViolations = true
+}
+
+checkstyleMain {
+    source = 'src/main/java'
+}
+
+checkstyleTest {
+    source = 'src/test/java'
+}
+
+// Task 의존성 설정 (Gradle 8.x 호환)
+tasks.named('distTar') {
+    dependsOn shadowJar
+}
+
+tasks.named('distZip') {
+    dependsOn shadowJar
+}
+
+tasks.named('startScripts') {
+    dependsOn shadowJar
+}
+
+tasks.named('startShadowScripts') {
+    dependsOn shadowJar, jar
+}
+
+tasks.named('shadowDistTar') {
+    dependsOn shadowJar
+}
+
+tasks.named('shadowDistZip') {
+    dependsOn shadowJar
 }
