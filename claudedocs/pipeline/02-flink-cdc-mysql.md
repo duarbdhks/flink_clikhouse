@@ -75,11 +75,11 @@ expire_logs_days = 7
 ### 2. CDC 전용 사용자 생성
 ```sql
 -- CDC 사용자 생성
-CREATE USER 'flink_cdc'@'%' IDENTIFIED BY 'cdc_password_123';
+CREATE USER 'cdc'@'%' IDENTIFIED BY 'cdc_password_123';
 
 -- 필요한 권한 부여
 GRANT SELECT, RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT
-ON *.* TO 'flink_cdc'@'%';
+ON *.* TO 'cdc'@'%';
 
 -- 권한 적용
 FLUSH PRIVILEGES;
@@ -212,7 +212,7 @@ public class CDCConfig {
     public static final String MYSQL_HOST = System.getenv().getOrDefault("MYSQL_HOST", "mysql");
     public static final int MYSQL_PORT = Integer.parseInt(System.getenv().getOrDefault("MYSQL_PORT", "3306"));
     public static final String MYSQL_DATABASE = System.getenv().getOrDefault("MYSQL_DATABASE", "order_db");
-    public static final String MYSQL_USERNAME = System.getenv().getOrDefault("MYSQL_USERNAME", "flink_cdc");
+    public static final String MYSQL_USERNAME = System.getenv().getOrDefault("MYSQL_USERNAME", "cdc");
     public static final String MYSQL_PASSWORD = System.getenv().getOrDefault("MYSQL_PASSWORD", "cdc_password_123");
 
     // CDC 설정
@@ -358,7 +358,7 @@ public class MySQLCDCJobSimple {
             .port(3306)
             .databaseList("order_db")
             .tableList("order_db.orders", "order_db.order_items")
-            .username("flink_cdc")
+            .username("cdc")
             .password("cdc_password_123")
             .startupOptions(StartupOptions.initial())
             .deserializer(new JsonDebeziumDeserializationSchema())
@@ -542,7 +542,7 @@ DELETE FROM orders WHERE order_id = 1001;
 ```sql
 -- 권한 재부여
 GRANT SELECT, RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT
-ON *.* TO 'flink_cdc'@'%';
+ON *.* TO 'cdc'@'%';
 FLUSH PRIVILEGES;
 ```
 
@@ -584,8 +584,8 @@ ENV KAFKA_BOOTSTRAP_SERVERS=kafka:9092
 ### 1. CDC 사용자 권한 최소화
 ```sql
 -- 특정 데이터베이스만 접근
-CREATE USER 'flink_cdc'@'%' IDENTIFIED BY 'strong_password';
-GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON order_db.* TO 'flink_cdc'@'%';
+CREATE USER 'cdc'@'%' IDENTIFIED BY 'strong_password';
+GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON order_db.* TO 'cdc'@'%';
 ```
 
 ### 2. 비밀번호 암호화

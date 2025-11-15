@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS orders_realtime (
     user_id UInt64 COMMENT '사용자 ID',
     status LowCardinality(String) COMMENT '주문 상태 (PENDING/PROCESSING/COMPLETED/CANCELLED)',
     total_amount Decimal(10, 2) COMMENT '총 주문 금액',
-    order_date DateTime COMMENT '주문 생성 일시',
+    created_at DateTime COMMENT '주문 생성 일시',
     updated_at DateTime COMMENT '마지막 수정 일시',
 
     -- CDC 메타데이터
@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS orders_realtime (
     sync_timestamp DateTime DEFAULT now() COMMENT 'ClickHouse 동기화 시각'
 )
 ENGINE = ReplacingMergeTree(updated_at)
-PARTITION BY toYYYYMM(order_date)
-ORDER BY (id, user_id, order_date)
+PARTITION BY toYYYYMM(created_at)
+ORDER BY (id, user_id, created_at)
 SETTINGS index_granularity = 8192
 COMMENT '실시간 주문 데이터 (MySQL CDC 동기화)';
 ```
@@ -62,7 +62,7 @@ COMMENT '실시간 주문 데이터 (MySQL CDC 동기화)';
 #### 설계 포인트
 - **ReplacingMergeTree**: 중복 제거 (같은 order_id의 최신 레코드만 유지)
 - **월별 파티션**: 오래된 데이터 삭제 용이 (`ALTER TABLE DROP PARTITION '202501'`)
-- **Primary Key**: (id, user_id, order_date) → 주문 ID 기반 조회 최적화
+- **Primary Key**: (id, user_id, created_at) → 주문 ID 기반 조회 최적화
 - **LowCardinality**: status, cdc_op (카디널리티 낮은 컬럼)
 
 ---
@@ -210,7 +210,7 @@ AS
 SELECT
     o.user_id,
 
-    max(o.order_date) AS last_order_date,
+    max(o.created_at) AS last_order_date,
     count(DISTINCT o.id) AS total_orders,
     sum(o.total_amount) AS total_spent,
     avg(o.total_amount) AS avg_order_value,
@@ -341,7 +341,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS mv_cart_analytics
 TO cart_analytics
 AS
 SELECT
-    toDate(o.order_date) AS order_date,
+    toDate(o.created_at) AS order_date,
 
     avg(item_counts.item_count) AS avg_items_per_order,
     avg(o.total_amount) AS avg_order_value,
@@ -413,14 +413,14 @@ SELECT
     (countIf(o.status = 'COMPLETED') * 100.0 / count(DISTINCT o.id)) AS completion_rate
 FROM orders_realtime o
 LEFT JOIN order_items_realtime oi ON o.id = oi.order_id
-WHERE toDate(o.order_date) = today()
+WHERE toDate(o.created_at) = today()
   AND o.cdc_op != 'd';
 ```
 
 ### 3. 시간대별 주문 패턴 (오늘)
 ```sql
 SELECT
-    toHour(o.order_date) AS hour,
+    toHour(o.created_at) AS hour,
     count(DISTINCT o.id) AS order_count,
     sum(o.total_amount) AS revenue,
     avg(oi_counts.item_count) AS avg_items_per_order
@@ -431,7 +431,7 @@ LEFT JOIN (
     WHERE toDate(created_at) = today() AND cdc_op != 'd'
     GROUP BY order_id
 ) AS oi_counts ON o.id = oi_counts.order_id
-WHERE toDate(o.order_date) = today()
+WHERE toDate(o.created_at) = today()
   AND o.cdc_op != 'd'
 GROUP BY hour
 ORDER BY hour;
@@ -510,8 +510,8 @@ LIMIT 20;
 WITH cohort_data AS (
     SELECT
         user_id,
-        toStartOfMonth(min(order_date)) AS cohort_month,
-        dateDiff('month', min(order_date), max(order_date)) AS customer_age_months,
+        toStartOfMonth(min(created_at)) AS cohort_month,
+        dateDiff('month', min(created_at), max(created_at)) AS customer_age_months,
         count(DISTINCT id) AS total_orders,
         sum(total_amount) AS total_revenue
     FROM orders_realtime
@@ -534,13 +534,13 @@ ORDER BY cohort_month DESC, customer_age_months ASC;
 ```sql
 WITH weekly_revenue AS (
     SELECT
-        toMonday(order_date) AS week_start,
+        toMonday(created_at) AS week_start,
         sum(total_amount) AS revenue,
         count(DISTINCT id) AS order_count
     FROM orders_realtime
     WHERE cdc_op != 'd'
       AND status = 'COMPLETED'
-      AND order_date >= now() - INTERVAL 12 WEEK
+      AND created_at >= now() - INTERVAL 12 WEEK
     GROUP BY week_start
 )
 SELECT
@@ -582,10 +582,10 @@ LIMIT 20;
 ```sql
 WITH daily_revenue AS (
     SELECT
-        toDate(order_date) AS date,
+        toDate(created_at) AS date,
         sum(total_amount) AS revenue
     FROM orders_realtime
-    WHERE order_date >= now() - INTERVAL 30 DAY
+    WHERE created_at >= now() - INTERVAL 30 DAY
       AND cdc_op != 'd'
       AND status = 'COMPLETED'
     GROUP BY date
@@ -607,16 +607,16 @@ LIMIT 30;
 ### 2. 주문량 시계열 분해 (트렌드 + 계절성)
 ```sql
 SELECT
-    toDate(order_date) AS date,
+    toDate(created_at) AS date,
     count() AS daily_orders,
 
     -- 7일 이동 평균 (트렌드)
-    avg(count()) OVER (ORDER BY toDate(order_date) ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS trend_7d,
+    avg(count()) OVER (ORDER BY toDate(created_at) ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS trend_7d,
 
     -- 요일별 계절성 (같은 요일 평균)
-    avgIf(count(), toDayOfWeek(order_date) = toDayOfWeek(today())) OVER () AS seasonal_pattern
+    avgIf(count(), toDayOfWeek(created_at) = toDayOfWeek(today())) OVER () AS seasonal_pattern
 FROM orders_realtime
-WHERE order_date >= now() - INTERVAL 60 DAY
+WHERE created_at >= now() - INTERVAL 60 DAY
   AND cdc_op != 'd'
 GROUP BY date
 ORDER BY date DESC;
@@ -678,7 +678,7 @@ ORDER BY sum(bytes_on_disk) DESC;
 ```sql
 -- orders 샘플
 INSERT INTO orders_realtime
-(id, user_id, status, total_amount, order_date, updated_at, cdc_op, cdc_ts_ms)
+(id, user_id, status, total_amount, created_at, updated_at, cdc_op, cdc_ts_ms)
 VALUES
     (1001, 101, 'COMPLETED', 1580.00, now() - INTERVAL 1 HOUR, now(), 'c', toUnixTimestamp(now()) * 1000),
     (1002, 102, 'PENDING', 75.00, now() - INTERVAL 30 MINUTE, now(), 'c', toUnixTimestamp(now()) * 1000),
@@ -885,8 +885,8 @@ CREATE TABLE IF NOT EXISTS orders_realtime (
     -- ... CDC 메타데이터 ...
 )
 ENGINE = ReplacingMergeTree(updated_at)
-PARTITION BY toYYYYMM(order_date)
-ORDER BY (id, user_id, order_date);
+PARTITION BY toYYYYMM(created_at)
+ORDER BY (id, user_id, created_at);
 
 -- Materialized View WHERE 절에 soft delete 필터 추가
 CREATE MATERIALIZED VIEW IF NOT EXISTS mv_product_daily_stats
@@ -914,7 +914,7 @@ SELECT
     user_id,
     status,
     total_amount,
-    order_date,
+    created_at,
     deleted_at
 FROM orders_realtime
 WHERE deleted_at IS NOT NULL
@@ -943,7 +943,7 @@ SELECT
 FROM orders_realtime
 WHERE cdc_op != 'd'
   AND deleted_at IS NULL
-ORDER BY order_date DESC;
+ORDER BY created_at DESC;
 ```
 
 ### Hard Delete vs Soft Delete 비교

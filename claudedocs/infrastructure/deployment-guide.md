@@ -55,9 +55,9 @@ flink_clickhouse/
 mkdir -p init-scripts
 cat > init-scripts/init-mysql.sql << 'EOF'
 -- CDC 사용자 생성
-CREATE USER 'flink_cdc'@'%' IDENTIFIED BY 'cdc_password_123';
+CREATE USER 'cdc'@'%' IDENTIFIED BY 'cdc_password_123';
 GRANT SELECT, RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT
-ON *.* TO 'flink_cdc'@'%';
+ON *.* TO 'cdc'@'%';
 FLUSH PRIVILEGES;
 
 -- 주문 데이터베이스 및 테이블 생성
@@ -129,11 +129,11 @@ SETTINGS index_granularity = 8192;
 -- 일별 집계 뷰
 CREATE MATERIALIZED VIEW orders_daily_summary
 ENGINE = SummingMergeTree()
-PARTITION BY toYYYYMM(order_date)
-ORDER BY (order_date, status)
+PARTITION BY toYYYYMM(sale_date)
+ORDER BY (sale_date, status)
 AS
 SELECT
-    toDate(created_at) AS order_date,
+    toDate(created_at) AS sale_date,
     status,
     count() AS order_count,
     sum(total_price) AS daily_revenue,
@@ -141,7 +141,7 @@ SELECT
     uniq(user_id) AS unique_customers
 FROM orders_realtime
 WHERE operation_type != 'DELETE'
-GROUP BY order_date, status;
+GROUP BY sale_date, status;
 
 -- 시간대별 통계 뷰
 CREATE MATERIALIZED VIEW orders_hourly_stats
