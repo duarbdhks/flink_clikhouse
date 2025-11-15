@@ -81,14 +81,14 @@ CREATE TABLE IF NOT EXISTS order_items (
 -- CDC 사용자 생성 및 권한 부여
 -- ============================================
 
--- Flink CDC 전용 사용자 생성
-CREATE USER IF NOT EXISTS 'flink_cdc'@'%' IDENTIFIED BY 'flink_cdc_password';
+-- CDC 전용 사용자 생성
+CREATE USER IF NOT EXISTS 'cdc'@'%' IDENTIFIED BY 'test123';
 
 -- CDC에 필요한 권한 부여
-GRANT SELECT, RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'flink_cdc'@'%';
+GRANT SELECT, RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc'@'%';
 
 -- order_db에 대한 모든 권한 부여
-GRANT ALL PRIVILEGES ON order_db.* TO 'flink_cdc'@'%';
+GRANT ALL PRIVILEGES ON order_db.* TO 'cdc'@'%';
 
 FLUSH PRIVILEGES;
 
