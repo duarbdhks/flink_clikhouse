@@ -31,11 +31,7 @@ public class ClickHouseSink {
      * ClickHouse가 자동으로 중복 제거 및 최신 버전 유지
      */
     public static SinkFunction<ClickHouseRow> createOrdersSink() {
-        String insertSQL = "INSERT INTO orders_realtime (" +
-                "id, user_id, status, total_amount, created_at, updated_at, " +
-                "cdc_op, cdc_ts_ms, sync_timestamp" +
-                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())";
-
+        String insertSQL = "INSERT INTO orders_realtime (id, user_id, status, total_amount, created_at, updated_at, cdc_op, cdc_ts_ms, sync_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())";
         int batchSize = ConfigLoader.getInt("clickhouse.batch.size", 1000);
         long batchIntervalMs = ConfigLoader.getLong("clickhouse.batch.interval.ms", 5000L);
         int maxRetries = ConfigLoader.getInt("clickhouse.max.retries", 3);
@@ -79,10 +75,7 @@ public class ClickHouseSink {
      * 개발/테스트용: 작은 배치 크기로 빠른 싱크
      */
     public static SinkFunction<ClickHouseRow> createOrdersSinkFast() {
-        String insertSQL = "INSERT INTO orders_realtime (" +
-                "id, user_id, status, total_amount, created_at, updated_at, " +
-                "cdc_op, cdc_ts_ms, sync_timestamp" +
-                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())";
+        String insertSQL = "INSERT INTO orders_realtime (id, user_id, status, total_amount, created_at, updated_at, cdc_op, cdc_ts_ms, sync_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())";
 
         int fastBatchSize = ConfigLoader.getInt("clickhouse.fast.batch.size", 100);
         long fastBatchIntervalMs = ConfigLoader.getLong("clickhouse.fast.batch.interval.ms", 1000L);

@@ -15,14 +15,13 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Kafka to ClickHouse Sync Job - Kafka CDC 이벤트를 ClickHouse로 동기화
- * <p>
  * 데이터 흐름:
  * Kafka Topic (orders-cdc-topic) -> Flink CDC Event Transformer -> ClickHouse Sink
- * <p>
  * 실행 방법:
  * flink run -c com.flink.sync.job.KafkaToClickHouseJob flink-sync-job.jar
  */
@@ -58,7 +57,7 @@ public class KafkaToClickHouseJob {
                 .map(new CDCEventTransformer())
                 .uid("cdc-transformer")
                 .name("CDC Event Transformer")
-                .filter(row -> row != null)  // null 필터링 (변환 실패 이벤트 제외)
+                .filter(Objects::nonNull)  // null 필터링 (변환 실패 이벤트 제외)
                 .uid("filter-null-rows")
                 .name("Filter Null Rows");
 
