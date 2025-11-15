@@ -23,8 +23,15 @@ GRANT SELECT ON order_db.* TO 'cdc'@'%';
 -- 권한 즉시 적용
 FLUSH PRIVILEGES;
 
+-- ============================================
+-- 데이터베이스 하드 삭제 및 재생성
+-- ============================================
+
+-- 기존 데이터베이스 완전 삭제
+DROP DATABASE IF EXISTS order_db;
+
 -- 데이터베이스 생성
-CREATE DATABASE IF NOT EXISTS order_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE order_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE order_db;
 
 -- ============================================
@@ -105,27 +112,7 @@ CREATE TABLE IF NOT EXISTS order_items (
 
 -- ============================================
 -- 샘플 데이터 삽입
--- 멱등성 보장: 기존 데이터 삭제 후 재삽입
 -- ============================================
-
--- 기존 샘플 데이터 삭제 (멱등성 보장)
-DELETE
-FROM order_items
-WHERE order_id IN (SELECT id FROM orders WHERE user_id IN (101, 102, 103, 104, 105, 106, 107, 108, 109));
-DELETE
-FROM orders
-WHERE user_id IN (101, 102, 103, 104, 105, 106, 107, 108, 109);
-DELETE
-FROM products
-WHERE id BETWEEN 1001 AND 10001;
-DELETE
-FROM users
-WHERE id BETWEEN 101 AND 109;
-
--- AUTO_INCREMENT 초기화
-ALTER TABLE orders AUTO_INCREMENT = 1;
-ALTER TABLE order_items AUTO_INCREMENT = 1;
-ALTER TABLE users AUTO_INCREMENT = 101;
 
 -- ============================================
 -- Users 샘플 데이터 (9명)

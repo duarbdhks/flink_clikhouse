@@ -3,8 +3,15 @@
 -- 목적: 실시간 OLAP 분석을 위한 테이블 및 Materialized Views 생성
 -- ============================================
 
+-- ============================================
+-- 데이터베이스 하드 삭제 및 재생성
+-- ============================================
+
+-- 기존 데이터베이스 완전 삭제
+DROP DATABASE IF EXISTS order_analytics;
+
 -- 데이터베이스 생성
-CREATE DATABASE IF NOT EXISTS order_analytics;
+CREATE DATABASE order_analytics;
 
 USE order_analytics;
 
