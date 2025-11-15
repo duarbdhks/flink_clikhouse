@@ -8,7 +8,9 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
@@ -64,7 +66,7 @@ public class CDCEventTransformer implements MapFunction<String, ClickHouseRow> {
             row.setUserId(getLongValue(data, "user_id"));
             row.setStatus(getStringValue(data, "status"));
             row.setTotalAmount(getBigDecimalValue(data, "total_amount"));
-            row.setOrderDate(getTimestampValue(data, "order_date"));
+            row.setCreatedAt(getTimestampValue(data, "created_at"));
             row.setUpdatedAt(getTimestampValue(data, "updated_at"));
             row.setCdcOp(operation);
             row.setCdcTsMs(event.getTimestampMs());
@@ -151,13 +153,11 @@ public class CDCEventTransformer implements MapFunction<String, ClickHouseRow> {
             // String 타입 (ISO 8601 포맷)
             String strValue = value.toString();
 
-            // ISO 8601 포맷 파싱
+            // ISO 8601 포맷 파싱 (UTC 타임존 지원)
             if (strValue.contains("T")) {
-                LocalDateTime dateTime = LocalDateTime.parse(
-                    strValue.replace("Z", ""),
-                    DATE_TIME_FORMATTER
-                );
-                return Timestamp.valueOf(dateTime);
+                // ZonedDateTime으로 파싱하여 타임존 정보 유지
+                Instant instant = Instant.parse(strValue);
+                return Timestamp.from(instant);
             }
 
             // Long string

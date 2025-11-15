@@ -12,7 +12,7 @@ import java.sql.Timestamp;
  * - user_id BIGINT
  * - status VARCHAR
  * - total_amount DECIMAL(10,2)
- * - order_date TIMESTAMP
+ * - created_at TIMESTAMP
  * - updated_at TIMESTAMP
  * - cdc_op VARCHAR(1)
  * - cdc_ts_ms BIGINT
@@ -25,7 +25,7 @@ public class ClickHouseRow implements Serializable {
     private Long userId;
     private String status;
     private BigDecimal totalAmount;
-    private Timestamp orderDate;
+    private Timestamp createdAt;
     private Timestamp updatedAt;
     private String cdcOp;
     private Long cdcTsMs;
@@ -35,12 +35,12 @@ public class ClickHouseRow implements Serializable {
     }
 
     public ClickHouseRow(Long id, Long userId, String status, BigDecimal totalAmount,
-                         Timestamp orderDate, Timestamp updatedAt, String cdcOp, Long cdcTsMs) {
+                         Timestamp createdAt, Timestamp updatedAt, String cdcOp, Long cdcTsMs) {
         this.id = id;
         this.userId = userId;
         this.status = status;
         this.totalAmount = totalAmount;
-        this.orderDate = orderDate;
+        this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.cdcOp = cdcOp;
         this.cdcTsMs = cdcTsMs;
@@ -79,12 +79,12 @@ public class ClickHouseRow implements Serializable {
         this.totalAmount = totalAmount;
     }
 
-    public Timestamp getOrderDate() {
-        return orderDate;
+    public Timestamp getCreatedAt() {
+        return createdAt;
     }
 
-    public void setOrderDate(Timestamp orderDate) {
-        this.orderDate = orderDate;
+    public void setCreatedAt(Timestamp createdAt) {
+        this.createdAt = createdAt;
     }
 
     public Timestamp getUpdatedAt() {
@@ -118,7 +118,7 @@ public class ClickHouseRow implements Serializable {
                 ", userId=" + userId +
                 ", status='" + status + '\'' +
                 ", totalAmount=" + totalAmount +
-                ", orderDate=" + orderDate +
+                ", createdAt=" + createdAt +
                 ", cdcOp='" + cdcOp + '\'' +
                 '}';
     }

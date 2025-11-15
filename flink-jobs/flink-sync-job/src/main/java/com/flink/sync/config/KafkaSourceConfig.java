@@ -3,6 +3,7 @@ package com.flink.sync.config;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
+import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 
 import java.util.Properties;
 
@@ -29,14 +30,14 @@ public class KafkaSourceConfig {
         kafkaProps.setProperty("enable.auto.commit", "false"); // Flink가 offset 관리
 
         return KafkaSource.<String>builder()
-                .setBootstrapServers(KAFKA_BROKERS)
-                .setTopics(ORDERS_TOPIC)
-                .setGroupId(CONSUMER_GROUP)
-                // 첫 실행: earliest (모든 메시지), 재시작: committed offset
-                .setStartingOffsets(OffsetsInitializer.committedOffsets())
-                .setValueOnlyDeserializer(new SimpleStringSchema())
-                .setProperties(kafkaProps)
-                .build();
+                          .setBootstrapServers(KAFKA_BROKERS)
+                          .setTopics(ORDERS_TOPIC)
+                          .setGroupId(CONSUMER_GROUP)
+                          // 첫 실행: earliest (모든 메시지), 재시작: committed offset
+                          .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
+                          .setValueOnlyDeserializer(new SimpleStringSchema())
+                          .setProperties(kafkaProps)
+                          .build();
     }
 
     /**
@@ -51,13 +52,13 @@ public class KafkaSourceConfig {
         kafkaProps.setProperty("enable.auto.commit", "false");
 
         return KafkaSource.<String>builder()
-                .setBootstrapServers(KAFKA_BROKERS)
-                .setTopics(ORDER_ITEMS_TOPIC)
-                .setGroupId(CONSUMER_GROUP + "-items")
-                .setStartingOffsets(OffsetsInitializer.committedOffsets())
-                .setValueOnlyDeserializer(new SimpleStringSchema())
-                .setProperties(kafkaProps)
-                .build();
+                          .setBootstrapServers(KAFKA_BROKERS)
+                          .setTopics(ORDER_ITEMS_TOPIC)
+                          .setGroupId(CONSUMER_GROUP + "-items")
+                          .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
+                          .setValueOnlyDeserializer(new SimpleStringSchema())
+                          .setProperties(kafkaProps)
+                          .build();
     }
 
     /**
@@ -65,11 +66,11 @@ public class KafkaSourceConfig {
      */
     public static KafkaSource<String> createOrdersSourceFromEarliest() {
         return KafkaSource.<String>builder()
-                .setBootstrapServers(KAFKA_BROKERS)
-                .setTopics(ORDERS_TOPIC)
-                .setGroupId(CONSUMER_GROUP + "-dev")
-                .setStartingOffsets(OffsetsInitializer.earliest())
-                .setValueOnlyDeserializer(new SimpleStringSchema())
-                .build();
+                          .setBootstrapServers(KAFKA_BROKERS)
+                          .setTopics(ORDERS_TOPIC)
+                          .setGroupId(CONSUMER_GROUP + "-dev")
+                          .setStartingOffsets(OffsetsInitializer.earliest())
+                          .setValueOnlyDeserializer(new SimpleStringSchema())
+                          .build();
     }
 }

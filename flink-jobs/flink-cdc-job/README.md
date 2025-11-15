@@ -106,8 +106,8 @@ flink cancel <job-id>
 # MySQL 연결 정보
 mysql.hostname=mysql
 mysql.port=3306
-mysql.username=flink_cdc
-mysql.password=flink_cdc_password
+mysql.username=cdc
+mysql.password=password
 
 # Kafka 연결 정보
 kafka.bootstrap.servers=kafka:9092
@@ -193,7 +193,7 @@ Error: Could not connect to MySQL
 ```
 **해결책:**
 - MySQL이 실행 중인지 확인
-- flink_cdc 사용자 권한 확인: `GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'flink_cdc'@'%';`
+- cdc 사용자 권한 확인: `GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc'@'%';`
 - binlog 활성화 확인: `show variables like 'log_bin';`
 
 #### 2. Kafka 연결 실패

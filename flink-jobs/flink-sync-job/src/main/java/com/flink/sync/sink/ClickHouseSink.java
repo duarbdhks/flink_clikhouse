@@ -17,18 +17,17 @@ import java.sql.SQLException;
 public class ClickHouseSink {
 
     private static final String CLICKHOUSE_URL = "jdbc:clickhouse://clickhouse:8123/order_analytics";
-    private static final String CLICKHOUSE_USER = "default";
-    private static final String CLICKHOUSE_PASSWORD = "";
+    private static final String CLICKHOUSE_USER = "admin";
+    private static final String CLICKHOUSE_PASSWORD = "test123";
 
     /**
      * Orders 테이블을 위한 ClickHouse Sink 생성
-     *
      * ReplacingMergeTree이므로 INSERT만 수행 (UPDATE/DELETE 없음)
      * ClickHouse가 자동으로 중복 제거 및 최신 버전 유지
      */
     public static SinkFunction<ClickHouseRow> createOrdersSink() {
         String insertSQL = "INSERT INTO orders_realtime (" +
-                "id, user_id, status, total_amount, order_date, updated_at, " +
+                "id, user_id, status, total_amount, created_at, updated_at, " +
                 "cdc_op, cdc_ts_ms, sync_timestamp" +
                 ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())";
 
@@ -36,10 +35,10 @@ public class ClickHouseSink {
                 insertSQL,
                 new OrdersStatementBuilder(),
                 JdbcExecutionOptions.builder()
-                        .withBatchSize(1000)           // 1000건씩 배치 insert
-                        .withBatchIntervalMs(5000L)    // 최대 5초 대기
-                        .withMaxRetries(3)             // 실패 시 3회 재시도
-                        .build(),
+                                    .withBatchSize(1000)           // 1000건씩 배치 insert
+                                    .withBatchIntervalMs(5000L)    // 최대 5초 대기
+                                    .withMaxRetries(3)             // 실패 시 3회 재시도
+                                    .build(),
                 new JdbcConnectionOptions.JdbcConnectionOptionsBuilder()
                         .withUrl(CLICKHOUSE_URL)
                         .withDriverName("com.clickhouse.jdbc.ClickHouseDriver")
@@ -59,7 +58,7 @@ public class ClickHouseSink {
             ps.setLong(2, row.getUserId());
             ps.setString(3, row.getStatus());
             ps.setBigDecimal(4, row.getTotalAmount());
-            ps.setTimestamp(5, row.getOrderDate());
+            ps.setTimestamp(5, row.getCreatedAt());
             ps.setTimestamp(6, row.getUpdatedAt());
             ps.setString(7, row.getCdcOp());
             ps.setLong(8, row.getCdcTsMs());
@@ -72,7 +71,7 @@ public class ClickHouseSink {
      */
     public static SinkFunction<ClickHouseRow> createOrdersSinkFast() {
         String insertSQL = "INSERT INTO orders_realtime (" +
-                "id, user_id, status, total_amount, order_date, updated_at, " +
+                "id, user_id, status, total_amount, created_at, updated_at, " +
                 "cdc_op, cdc_ts_ms, sync_timestamp" +
                 ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())";
 
@@ -80,10 +79,10 @@ public class ClickHouseSink {
                 insertSQL,
                 new OrdersStatementBuilder(),
                 JdbcExecutionOptions.builder()
-                        .withBatchSize(100)            // 100건씩 배치
-                        .withBatchIntervalMs(1000L)    // 1초 간격
-                        .withMaxRetries(3)
-                        .build(),
+                                    .withBatchSize(100)            // 100건씩 배치
+                                    .withBatchIntervalMs(1000L)    // 1초 간격
+                                    .withMaxRetries(3)
+                                    .build(),
                 new JdbcConnectionOptions.JdbcConnectionOptionsBuilder()
                         .withUrl(CLICKHOUSE_URL)
                         .withDriverName("com.clickhouse.jdbc.ClickHouseDriver")
