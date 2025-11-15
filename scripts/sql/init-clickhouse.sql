@@ -1,24 +1,27 @@
 -- ============================================
--- ClickHouse 초기화 스크립트
+-- ClickHouse 초기화 스크립트 (Orders + Order Items 통합)
 -- 목적: 실시간 OLAP 분석을 위한 테이블 및 Materialized Views 생성
 -- ============================================
 
 -- 데이터베이스 생성
 CREATE DATABASE IF NOT EXISTS order_analytics;
 
+USE order_analytics;
+
 -- ============================================
--- 메인 테이블: orders_realtime
+-- 메인 테이블 1: orders_realtime
 -- 엔진: ReplacingMergeTree (중복 제거 지원)
 -- ============================================
 
-CREATE TABLE IF NOT EXISTS order_analytics.orders_realtime (
+CREATE TABLE IF NOT EXISTS orders_realtime (
   id             UInt64 COMMENT '주문 ID',
   user_id        UInt64 COMMENT '사용자 ID',
-  status         String COMMENT '주문 상태',
+  status         LowCardinality(String) COMMENT '주문 상태 (PENDING/PROCESSING/COMPLETED/CANCELLED)',
   total_amount   Decimal(10, 2) COMMENT '총 주문 금액',
   order_date     DateTime COMMENT '주문 생성 일시',
   updated_at     DateTime COMMENT '마지막 수정 일시',
-  cdc_op         String COMMENT 'CDC 작업 타입 (c=create, u=update, d=delete)',
+  deleted_at     Nullable(DateTime) COMMENT 'Soft Delete 일시 (NULL=활성)',
+  cdc_op         LowCardinality(String) COMMENT 'CDC 작업 타입 (c=create, u=update, d=delete)',
   cdc_ts_ms      UInt64 COMMENT 'CDC 타임스탬프 (밀리초)',
   sync_timestamp DateTime DEFAULT now() COMMENT '동기화 타임스탬프'
 )
@@ -28,180 +31,277 @@ CREATE TABLE IF NOT EXISTS order_analytics.orders_realtime (
     COMMENT '실시간 주문 데이터 (CDC 동기화)';
 
 -- ============================================
--- Materialized View 1: 일별 주문 집계
+-- 메인 테이블 2: order_items_realtime
+-- 엔진: ReplacingMergeTree (중복 제거 지원)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS order_items_realtime (
+  id             UInt64 COMMENT '주문 항목 ID',
+  order_id       UInt64 COMMENT '주문 ID (orders.id 참조)',
+  product_id     UInt64 COMMENT '상품 ID',
+  product_name   String COMMENT '상품명',
+  quantity       UInt32 COMMENT '주문 수량',
+  price          Decimal(10, 2) COMMENT '단가',
+  subtotal       Decimal(10, 2) COMMENT '소계 (quantity * price)',
+  created_at     DateTime COMMENT '생성 일시',
+  updated_at     DateTime COMMENT '수정 일시',
+  deleted_at     Nullable(DateTime) COMMENT 'Soft Delete 일시 (NULL=활성)',
+  cdc_op         LowCardinality(String) COMMENT 'CDC 작업 타입',
+  cdc_ts_ms      UInt64 COMMENT 'CDC 타임스탬프 (밀리초)',
+  sync_timestamp DateTime DEFAULT now() COMMENT 'ClickHouse 동기화 시각'
+)
+  ENGINE = ReplacingMergeTree(updated_at) PARTITION BY toYYYYMM(created_at)
+    ORDER BY (id, order_id, product_id)
+    SETTINGS index_granularity = 8192
+    COMMENT '실시간 주문 항목 데이터';
+
+-- ============================================
+-- Materialized View 1: 상품 일별 통계
 -- 엔진: SummingMergeTree (자동 합산)
 -- ============================================
 
 -- 집계 테이블 생성
-CREATE TABLE IF NOT EXISTS order_analytics.orders_daily_summary (
-  order_date      Date COMMENT '주문 날짜',
-  status          String COMMENT '주문 상태',
-  order_count     UInt64 COMMENT '주문 건수',
-  total_revenue   Decimal(18, 2) COMMENT '총 매출',
-  avg_order_value Decimal(10, 2) COMMENT '평균 주문 금액'
+CREATE TABLE IF NOT EXISTS product_daily_stats (
+  sale_date        Date COMMENT '판매 날짜',
+  product_id       UInt64 COMMENT '상품 ID',
+  product_name     String COMMENT '상품명',
+  order_count      UInt32 COMMENT '주문 건수',
+  total_quantity   UInt64 COMMENT '총 판매 수량',
+  total_revenue    Decimal(18, 2) COMMENT '총 매출',
+  avg_price        Decimal(10, 2) COMMENT '평균 단가',
+  unique_customers UInt32 COMMENT '구매 고객 수',
+  updated_at       DateTime DEFAULT now()
 )
-  ENGINE = SummingMergeTree((order_count, total_revenue)) PARTITION BY toYYYYMM(order_date)
-    ORDER BY (order_date, status)
+  ENGINE = SummingMergeTree((order_count, total_quantity, total_revenue, unique_customers)) PARTITION BY toYYYYMM(sale_date)
+    ORDER BY (sale_date, product_id)
     SETTINGS index_granularity = 8192
-    COMMENT '일별 주문 요약 집계';
+    COMMENT '상품별 일별 판매 통계';
 
 -- Materialized View 생성
-CREATE MATERIALIZED VIEW IF NOT EXISTS order_analytics.mv_orders_daily_summary
-  TO order_analytics.orders_daily_summary
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_product_daily_stats
+  TO product_daily_stats
 AS
-SELECT toDate(order_date) AS order_date,
-       status,
-       count(*)           AS order_count,
-       sum(total_amount)  AS total_revenue,
-       avg(total_amount)  AS avg_order_value
-FROM order_analytics.orders_realtime
-WHERE cdc_op != 'd' -- DELETE 이벤트 제외
-GROUP BY order_date, status;
+SELECT toDate(oi.created_at)       AS sale_date,
+       oi.product_id,
+       any(oi.product_name)        AS product_name,
+       count(DISTINCT oi.order_id) AS order_count,
+       sum(oi.quantity)            AS total_quantity,
+       sum(oi.subtotal)            AS total_revenue,
+       avg(oi.price)               AS avg_price,
+       uniq(o.user_id)             AS unique_customers,
+       now()                       AS updated_at
+FROM order_items_realtime oi
+INNER JOIN orders_realtime o ON oi.order_id = o.id
+WHERE oi.cdc_op != 'd'
+  AND o.cdc_op != 'd'
+  AND oi.deleted_at IS NULL
+  AND o.deleted_at IS NULL
+  AND o.status != 'CANCELLED'
+GROUP BY sale_date, oi.product_id;
 
 -- ============================================
--- Materialized View 2: 시간별 주문 통계
--- 엔진: AggregatingMergeTree (집계 함수 지원)
--- ============================================
-
--- 집계 테이블 생성
-CREATE TABLE IF NOT EXISTS order_analytics.orders_hourly_stats (
-  hour_timestamp   DateTime COMMENT '시간 단위 (YYYY-MM-DD HH:00:00)',
-  status           String COMMENT '주문 상태',
-  order_count      AggregateFunction(count, UInt64) COMMENT '주문 건수 (집계)',
-  total_revenue    AggregateFunction(sum, Decimal(18, 2)) COMMENT '총 매출 (집계)',
-  max_order_amount AggregateFunction(max, Decimal(10, 2)) COMMENT '최대 주문 금액 (집계)',
-  min_order_amount AggregateFunction(min, Decimal(10, 2)) COMMENT '최소 주문 금액 (집계)'
-)
-  ENGINE = AggregatingMergeTree() PARTITION BY toYYYYMM(hour_timestamp)
-    ORDER BY (hour_timestamp, status)
-    SETTINGS index_granularity = 8192
-    COMMENT '시간별 주문 통계';
-
--- Materialized View 생성
-CREATE MATERIALIZED VIEW IF NOT EXISTS order_analytics.mv_orders_hourly_stats
-  TO order_analytics.orders_hourly_stats
-AS
-SELECT toStartOfHour(order_date) AS hour_timestamp,
-       status,
-       countState(*)             AS order_count,
-       sumState(total_amount)    AS total_revenue,
-       maxState(total_amount)    AS max_order_amount,
-       minState(total_amount)    AS min_order_amount
-FROM order_analytics.orders_realtime
-WHERE cdc_op != 'd' -- DELETE 이벤트 제외
-GROUP BY hour_timestamp, status;
-
--- ============================================
--- Materialized View 3: 사용자별 구매 이력
+-- Materialized View 2: 고객 세그먼트 분석
 -- 엔진: ReplacingMergeTree
 -- ============================================
 
 -- 집계 테이블 생성
-CREATE TABLE IF NOT EXISTS order_analytics.user_purchase_history (
-  user_id          UInt64 COMMENT '사용자 ID',
-  first_order_date DateTime COMMENT '첫 구매 일시',
-  last_order_date  DateTime COMMENT '최근 구매 일시',
-  total_orders     UInt32 COMMENT '총 주문 건수',
-  total_spent      Decimal(18, 2) COMMENT '총 구매 금액',
-  avg_order_value  Decimal(10, 2) COMMENT '평균 주문 금액',
-  completed_orders UInt32 COMMENT '완료된 주문 건수',
-  cancelled_orders UInt32 COMMENT '취소된 주문 건수',
-  updated_at       DateTime DEFAULT now() COMMENT '업데이트 시각'
+CREATE TABLE IF NOT EXISTS customer_segments (
+  user_id             UInt64 COMMENT '사용자 ID',
+  last_order_date     DateTime COMMENT '최근 주문 일시',
+  total_orders        UInt32 COMMENT '총 주문 건수',
+  total_spent         Decimal(18, 2) COMMENT '총 구매 금액 (LTV)',
+  avg_order_value     Decimal(10, 2) COMMENT '평균 주문 금액',
+  unique_products     UInt32 COMMENT '구매한 고유 상품 수',
+  total_items         UInt64 COMMENT '총 구매 상품 개수',
+  avg_items_per_order Decimal(10, 2) COMMENT '주문당 평균 상품 수',
+  completed_orders    UInt32 COMMENT '완료된 주문 수',
+  cancelled_orders    UInt32 COMMENT '취소된 주문 수',
+  updated_at          DateTime DEFAULT now()
 )
   ENGINE = ReplacingMergeTree(updated_at)
     ORDER BY user_id SETTINGS index_granularity = 8192
-    COMMENT '사용자별 구매 이력 요약';
+    COMMENT '고객별 구매 세그먼트';
 
 -- Materialized View 생성
-CREATE MATERIALIZED VIEW IF NOT EXISTS order_analytics.mv_user_purchase_history
-  TO order_analytics.user_purchase_history
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_customer_segments
+  TO customer_segments
 AS
-SELECT user_id,
-       min(order_date)               AS first_order_date,
-       max(order_date)               AS last_order_date,
-       count(*)                      AS total_orders,
-       sum(total_amount)             AS total_spent,
-       avg(total_amount)             AS avg_order_value,
-       countIf(status = 'COMPLETED') AS completed_orders,
-       countIf(status = 'CANCELLED') AS cancelled_orders,
-       now()                         AS updated_at
-FROM order_analytics.orders_realtime
-WHERE cdc_op != 'd' -- DELETE 이벤트 제외
-GROUP BY user_id;
+SELECT o.user_id,
+       max(o.order_date)                       AS last_order_date,
+       count(DISTINCT o.id)                    AS total_orders,
+       sum(o.total_amount)                     AS total_spent,
+       avg(o.total_amount)                     AS avg_order_value,
+       uniq(oi.product_id)                     AS unique_products,
+       sum(oi.quantity)                        AS total_items,
+       sum(oi.quantity) / count(DISTINCT o.id) AS avg_items_per_order,
+       countIf(o.status = 'COMPLETED')         AS completed_orders,
+       countIf(o.status = 'CANCELLED')         AS cancelled_orders,
+       now()                                   AS updated_at
+FROM orders_realtime o
+LEFT JOIN order_items_realtime oi ON o.id = oi.order_id AND oi.deleted_at IS NULL
+WHERE o.cdc_op != 'd'
+  AND o.deleted_at IS NULL
+GROUP BY o.user_id;
 
 -- ============================================
--- 인덱스 생성 (쿼리 성능 최적화)
--- 참고: 인덱스가 이미 존재하면 에러가 발생하지만, 스크립트는 계속 실행됩니다
+-- Materialized View 3: 시간별 상품 매출
+-- 엔진: AggregatingMergeTree (집계 함수 지원)
 -- ============================================
+
+-- 집계 테이블 생성
+CREATE TABLE IF NOT EXISTS hourly_sales_by_product (
+  hour_timestamp DateTime COMMENT '시간 단위 (YYYY-MM-DD HH:00:00)',
+  product_id     UInt64 COMMENT '상품 ID',
+  product_name   String COMMENT '상품명',
+  order_count    AggregateFunction(count, UInt64) COMMENT '주문 건수',
+  total_quantity AggregateFunction(sum, UInt64) COMMENT '판매 수량',
+  total_revenue  AggregateFunction(sum, Decimal(18, 2)) COMMENT '총 매출',
+  avg_price      AggregateFunction(avg, Decimal(10, 2)) COMMENT '평균 단가'
+)
+  ENGINE = AggregatingMergeTree() PARTITION BY toYYYYMM(hour_timestamp)
+    ORDER BY (hour_timestamp, product_id)
+    SETTINGS index_granularity = 8192
+    COMMENT '시간별 상품 판매 통계';
+
+-- Materialized View 생성
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_hourly_sales_by_product
+  TO hourly_sales_by_product
+AS
+SELECT toStartOfHour(oi.created_at)     AS hour_timestamp,
+       oi.product_id,
+       any(oi.product_name)             AS product_name,
+       countState(DISTINCT oi.order_id) AS order_count,
+       sumState(oi.quantity)            AS total_quantity,
+       sumState(oi.subtotal)            AS total_revenue,
+       avgState(oi.price)               AS avg_price
+FROM order_items_realtime oi
+INNER JOIN orders_realtime o ON oi.order_id = o.id
+WHERE oi.cdc_op != 'd'
+  AND oi.deleted_at IS NULL
+  AND o.deleted_at IS NULL
+  AND o.status != 'CANCELLED'
+GROUP BY hour_timestamp, oi.product_id;
+
+-- ============================================
+-- Materialized View 4: 장바구니 분석
+-- 엔진: ReplacingMergeTree
+-- ============================================
+
+-- 집계 테이블 생성
+CREATE TABLE IF NOT EXISTS cart_analytics (
+  order_date          Date COMMENT '주문 날짜',
+  avg_items_per_order Decimal(10, 2) COMMENT '주문당 평균 상품 수',
+  avg_order_value     Decimal(10, 2) COMMENT '평균 주문 금액',
+  avg_item_price      Decimal(10, 2) COMMENT '평균 상품 단가',
+  total_orders        UInt32 COMMENT '총 주문 수',
+  completed_orders    UInt32 COMMENT '완료된 주문 수',
+  completion_rate     Decimal(5, 2) COMMENT '주문 완료율 (%)',
+  updated_at          DateTime DEFAULT now()
+)
+  ENGINE = ReplacingMergeTree(updated_at) PARTITION BY toYYYYMM(order_date)
+    ORDER BY order_date SETTINGS index_granularity = 8192
+    COMMENT '장바구니 및 주문 완료율 분석';
+
+-- Materialized View 생성
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_cart_analytics
+  TO cart_analytics
+AS
+SELECT toDate(o.order_date)                                             AS order_date,
+       avg(item_counts.item_count)                                      AS avg_items_per_order,
+       avg(o.total_amount)                                              AS avg_order_value,
+       avg(oi.price)                                                    AS avg_item_price,
+       count(DISTINCT o.id)                                             AS total_orders,
+       countIf(o.status = 'COMPLETED')                                  AS completed_orders,
+       (countIf(o.status = 'COMPLETED') * 100.0 / count(DISTINCT o.id)) AS completion_rate,
+       now()                                                            AS updated_at
+FROM orders_realtime o
+LEFT JOIN order_items_realtime oi ON o.id = oi.order_id AND oi.deleted_at IS NULL
+LEFT JOIN (SELECT order_id, count() AS item_count
+           FROM order_items_realtime
+           WHERE cdc_op != 'd'
+             AND deleted_at IS NULL
+           GROUP BY order_id) AS item_counts ON o.id = item_counts.order_id
+WHERE o.cdc_op != 'd'
+  AND o.deleted_at IS NULL
+GROUP BY order_date;
 
 -- ============================================
 -- 샘플 쿼리 (테스트 및 검증용)
 -- ============================================
 
--- 1. 실시간 주문 현황 조회
+-- 1. 실시간 베스트셀러 (최근 1시간)
 -- SELECT
---     status,
---     count(*) AS order_count,
---     sum(total_amount) AS total_revenue,
---     avg(total_amount) AS avg_order_value
--- FROM order_analytics.orders_realtime
--- WHERE toDate(order_date) = today()
--- GROUP BY status
--- ORDER BY order_count DESC;
-
--- 2. 시간별 주문 통계 조회 (AggregatingMergeTree 읽기)
--- SELECT
---     hour_timestamp,
---     status,
---     countMerge(order_count) AS orders,
---     sumMerge(total_revenue) AS revenue,
---     maxMerge(max_order_amount) AS max_amount,
---     minMerge(min_order_amount) AS min_amount
--- FROM order_analytics.orders_hourly_stats
--- WHERE hour_timestamp >= toStartOfHour(now() - INTERVAL 24 HOUR)
--- GROUP BY hour_timestamp, status
--- ORDER BY hour_timestamp DESC, orders DESC;
-
--- 3. 일별 주문 요약 조회
--- SELECT
---     order_date,
---     status,
---     sum(order_count) AS total_orders,
---     sum(total_revenue) AS total_revenue,
---     avg(avg_order_value) AS avg_value
--- FROM order_analytics.orders_daily_summary
--- WHERE order_date >= today() - INTERVAL 7 DAY
--- GROUP BY order_date, status
--- ORDER BY order_date DESC, status;
-
--- 4. 사용자별 구매 이력 조회 (Top 10 VIP)
--- SELECT
---     user_id,
---     total_orders,
---     total_spent,
---     avg_order_value,
---     completed_orders,
---     cancelled_orders,
---     dateDiff('day', first_order_date, last_order_date) AS customer_lifetime_days
--- FROM order_analytics.user_purchase_history
--- ORDER BY total_spent DESC
+--     oi.product_name,
+--     count(DISTINCT oi.order_id) AS order_count,
+--     sum(oi.quantity) AS quantity_sold,
+--     sum(oi.subtotal) AS revenue,
+--     avg(oi.price) AS avg_price
+-- FROM order_items_realtime oi
+-- INNER JOIN orders_realtime o ON oi.order_id = o.id
+-- WHERE oi.created_at >= now() - INTERVAL 1 HOUR
+--   AND oi.cdc_op != 'd'
+--   AND o.status != 'CANCELLED'
+-- GROUP BY oi.product_name
+-- ORDER BY revenue DESC
 -- LIMIT 10;
 
--- 5. 최근 1시간 주문 현황 (실시간 모니터링)
+-- 2. 오늘 매출 KPI
 -- SELECT
---     toStartOfMinute(order_date) AS minute,
---     count(*) AS orders_per_minute,
---     sum(total_amount) AS revenue_per_minute
--- FROM order_analytics.orders_realtime
--- WHERE order_date >= now() - INTERVAL 1 HOUR
--- GROUP BY minute
--- ORDER BY minute DESC;
+--     count(DISTINCT o.id) AS total_orders,
+--     sum(o.total_amount) AS total_revenue,
+--     avg(o.total_amount) AS avg_order_value,
+--     uniq(o.user_id) AS unique_customers,
+--     sum(oi.quantity) AS total_items_sold,
+--     uniq(oi.product_id) AS unique_products_sold,
+--     (countIf(o.status = 'COMPLETED') * 100.0 / count(DISTINCT o.id)) AS completion_rate
+-- FROM orders_realtime o
+-- LEFT JOIN order_items_realtime oi ON o.id = oi.order_id
+-- WHERE toDate(o.order_date) = today()
+--   AND o.cdc_op != 'd';
+
+-- 3. 고객 세그먼트 분류 (Hot/Warm/Cold/Churned)
+-- SELECT
+--     CASE
+--         WHEN dateDiff('day', last_order_date, now()) <= 7 THEN 'Hot'
+--         WHEN dateDiff('day', last_order_date, now()) <= 30 THEN 'Warm'
+--         WHEN dateDiff('day', last_order_date, now()) <= 90 THEN 'Cold'
+--         ELSE 'Churned'
+--     END AS segment,
+--     count() AS customer_count,
+--     avg(total_spent) AS avg_ltv,
+--     avg(total_orders) AS avg_orders,
+--     avg(unique_products) AS avg_product_diversity
+-- FROM customer_segments
+-- GROUP BY segment
+-- ORDER BY avg_ltv DESC;
+
+-- 4. 시간별 상품 매출 (최근 24시간)
+-- SELECT
+--     hour_timestamp,
+--     product_name,
+--     countMerge(order_count) AS orders,
+--     sumMerge(total_quantity) AS quantity,
+--     sumMerge(total_revenue) AS revenue
+-- FROM hourly_sales_by_product
+-- WHERE hour_timestamp >= now() - INTERVAL 24 HOUR
+-- GROUP BY hour_timestamp, product_name
+-- ORDER BY hour_timestamp DESC, revenue DESC;
+
+-- 5. 장바구니 트렌드 (최근 7일)
+-- SELECT
+--     order_date,
+--     avg_items_per_order,
+--     avg_order_value,
+--     completion_rate
+-- FROM cart_analytics
+-- WHERE order_date >= today() - INTERVAL 7 DAY
+-- ORDER BY order_date DESC;
 
 -- ============================================
 -- 테이블 정보 확인
 -- ============================================
 
-SELECT '✅ ClickHouse 초기화 완료' AS status;
+SELECT '✅ ClickHouse 초기화 완료 (Orders + Order Items 통합)' AS status;
 
 SELECT database,
        name                            AS table_name,

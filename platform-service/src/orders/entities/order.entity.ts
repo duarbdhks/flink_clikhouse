@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
   OneToMany,
   ManyToOne,
   JoinColumn,
@@ -58,6 +59,14 @@ export class Order {
   @ApiProperty({ description: '마지막 수정 일시', example: '2025-01-10T09:15:30.000Z' })
   @UpdateDateColumn({ type: 'timestamp', name: 'updated_at' })
   updatedAt: Date;
+
+  @ApiProperty({
+    description: 'Soft Delete 일시 (NULL=활성)',
+    example: null,
+    required: false,
+  })
+  @DeleteDateColumn({ type: 'timestamp', name: 'deleted_at', nullable: true })
+  deletedAt: Date | null;
 
   @ApiProperty({ description: '주문 항목 목록', type: () => [OrderItem] })
   @OneToMany(() => OrderItem, (orderItem) => orderItem.order, {

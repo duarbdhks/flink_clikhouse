@@ -5,6 +5,8 @@ import {
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Order } from './order.entity';
@@ -42,6 +44,18 @@ export class OrderItem {
   @ApiProperty({ description: '생성 일시', example: '2025-01-10T09:15:30.000Z' })
   @CreateDateColumn({ type: 'timestamp', name: 'created_at' })
   createdAt: Date;
+
+  @ApiProperty({ description: '마지막 수정 일시', example: '2025-01-10T09:15:30.000Z' })
+  @UpdateDateColumn({ type: 'timestamp', name: 'updated_at' })
+  updatedAt: Date;
+
+  @ApiProperty({
+    description: 'Soft Delete 일시 (NULL=활성)',
+    example: null,
+    required: false,
+  })
+  @DeleteDateColumn({ type: 'timestamp', name: 'deleted_at', nullable: true })
+  deletedAt: Date | null;
 
   @ManyToOne(() => Order, (order) => order.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'order_id' })

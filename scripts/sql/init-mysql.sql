@@ -22,8 +22,11 @@ CREATE TABLE IF NOT EXISTS users (
   email      VARCHAR(100) NOT NULL UNIQUE COMMENT '이메일 (고유)',
   phone      VARCHAR(20) COMMENT '전화번호',
   created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '계정 생성 일시',
+  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '마지막 수정 일시',
+  deleted_at TIMESTAMP    NULL     DEFAULT NULL COMMENT 'Soft Delete 일시 (NULL=활성)',
   INDEX idx_email (email),
-  INDEX idx_username (username)
+  INDEX idx_username (username),
+  INDEX idx_deleted_at (deleted_at)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='사용자 정보 테이블';
@@ -38,9 +41,11 @@ CREATE TABLE IF NOT EXISTS products (
   description TEXT COMMENT '상품 설명',
   created_at  TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '상품 등록 일시',
   updated_at  TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '마지막 수정 일시',
+  deleted_at  TIMESTAMP      NULL     DEFAULT NULL COMMENT 'Soft Delete 일시 (NULL=활성)',
   INDEX idx_category (category),
   INDEX idx_price (price),
-  INDEX idx_name (name)
+  INDEX idx_name (name),
+  INDEX idx_deleted_at (deleted_at)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='상품 정보 테이블';
@@ -53,9 +58,11 @@ CREATE TABLE IF NOT EXISTS orders (
   total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT '총 주문 금액',
   order_date   TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '주문 생성 일시',
   updated_at   TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '마지막 수정 일시',
+  deleted_at   TIMESTAMP      NULL     DEFAULT NULL COMMENT 'Soft Delete 일시 (NULL=활성)',
   INDEX idx_user_id (user_id),
   INDEX idx_status (status),
-  INDEX idx_order_date (order_date)
+  INDEX idx_order_date (order_date),
+  INDEX idx_deleted_at (deleted_at)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='주문 마스터 테이블';
@@ -70,9 +77,12 @@ CREATE TABLE IF NOT EXISTS order_items (
   price        DECIMAL(10, 2) NOT NULL COMMENT '단가',
   subtotal     DECIMAL(10, 2) NOT NULL COMMENT '소계 (quantity * price)',
   created_at   TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시',
+  updated_at   TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '마지막 수정 일시',
+  deleted_at   TIMESTAMP      NULL     DEFAULT NULL COMMENT 'Soft Delete 일시 (NULL=활성)',
   FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
   INDEX idx_order_id (order_id),
-  INDEX idx_product_id (product_id)
+  INDEX idx_product_id (product_id),
+  INDEX idx_deleted_at (deleted_at)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='주문 상세 항목 테이블';

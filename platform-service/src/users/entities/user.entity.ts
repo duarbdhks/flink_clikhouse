@@ -3,6 +3,8 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
   OneToMany,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
@@ -39,6 +41,21 @@ export class User {
   })
   @CreateDateColumn({ type: 'timestamp', name: 'created_at' })
   createdAt: Date;
+
+  @ApiProperty({
+    description: '마지막 수정 일시',
+    example: '2024-12-01T10:00:00.000Z',
+  })
+  @UpdateDateColumn({ type: 'timestamp', name: 'updated_at' })
+  updatedAt: Date;
+
+  @ApiProperty({
+    description: 'Soft Delete 일시 (NULL=활성)',
+    example: null,
+    required: false,
+  })
+  @DeleteDateColumn({ type: 'timestamp', name: 'deleted_at', nullable: true })
+  deletedAt: Date | null;
 
   @ApiProperty({
     description: '사용자의 주문 목록',
