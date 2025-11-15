@@ -88,6 +88,7 @@ nav {
 nav .brand-logo {
     left: 0;
     transform: none;
+    padding: 0 1rem;
 }
 
 nav a {
@@ -99,8 +100,8 @@ nav a {
 }
 
 nav a:hover {
-    background-color: var(--light-bg);
-    color: var(--primary-color);
+    background-color: #2563EB;
+    color: #fff;
 }
 
 /* ========================================
