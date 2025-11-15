@@ -38,7 +38,7 @@ TOPICS=(
     "order-items-cdc-topic"
 )
 
-PARTITIONS=3
+PARTITIONS=1  # CDC 순서 보장을 위해 1개로 설정
 REPLICATION_FACTOR=1
 
 # Topic 생성 함수

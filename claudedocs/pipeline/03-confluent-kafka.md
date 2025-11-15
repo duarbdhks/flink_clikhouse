@@ -100,7 +100,7 @@ docker run --rm confluentinc/cp-kafka:7.6.0 kafka-storage random-uuid
 ```yaml
 Topic Name: orders-cdc-topic
 Purpose: orders 테이블 CDC 이벤트 스트림
-Partitions: 3
+Partitions: 1  # CDC 순서 보장을 위해 1개로 설정
 Replication Factor: 1 (단일 브로커)
 Retention: 7 days
 Cleanup Policy: delete
@@ -110,7 +110,7 @@ Cleanup Policy: delete
 ```yaml
 Topic Name: order-items-cdc-topic
 Purpose: order_items 테이블 CDC 이벤트 스트림
-Partitions: 3
+Partitions: 1  # CDC 순서 보장을 위해 1개로 설정
 Replication Factor: 1
 Retention: 7 days
 Cleanup Policy: delete
@@ -137,9 +137,9 @@ create_topic() {
   echo "✅ Topic '${topic_name}' created with ${partitions} partitions"
 }
 
-# CDC Topics 생성
-create_topic "orders-cdc-topic" 3 604800000       # 7일 (7 * 24 * 60 * 60 * 1000)
-create_topic "order-items-cdc-topic" 3 604800000  # 7일
+# CDC Topics 생성 (CDC 순서 보장을 위해 파티션 1개)
+create_topic "orders-cdc-topic" 1 604800000       # 7일 (7 * 24 * 60 * 60 * 1000)
+create_topic "order-items-cdc-topic" 1 604800000  # 7일
 
 # Topic 목록 확인
 docker exec -it kafka kafka-topics --list --bootstrap-server localhost:9092
@@ -368,8 +368,8 @@ services:
 ### MVP 환경 (소규모 트래픽)
 ```yaml
 environment:
-  # Partition 수 최소화
-  KAFKA_NUM_PARTITIONS: 3
+  # CDC Topic Partition (순서 보장을 위해 1로 설정)
+  KAFKA_NUM_PARTITIONS: 1
 
   # Replication Factor
   KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -389,7 +389,8 @@ environment:
 ### 프로덕션 환경 (대규모 트래픽)
 ```yaml
 environment:
-  # Partition 수 증가
+  # CDC Topic Partition (Key 기반 파티셔닝 필수!)
+  # 주의: Flink CDC에서 order_id를 Kafka Key로 설정해야 순서 보장
   KAFKA_NUM_PARTITIONS: 6
 
   # Replication Factor
@@ -547,6 +548,60 @@ environment:
   KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/kafka.truststore.jks
   KAFKA_SSL_TRUSTSTORE_PASSWORD: changeit
 ```
+
+## 🎯 CDC Partition 전략
+
+### MVP 권장: 파티션 1개 (순서 보장 우선)
+
+**이유**:
+1. **순서 보장**: CDC 이벤트는 순서가 중요 (INSERT → UPDATE → DELETE)
+2. **데이터 정합성**: 순서가 뒤바뀌면 데이터 손실/오류 발생 가능
+3. **충분한 성능**: MVP 목표 100-1,000 TPS는 파티션 1개로도 처리 가능
+4. **단순성**: Key 설정 불필요, Flink CDC 코드 수정 최소화
+
+**순서 보장 예시**:
+```
+✅ 올바른 순서 (파티션 1개):
+1. INSERT order_id=100, status='PENDING'
+2. UPDATE order_id=100, status='CONFIRMED'
+3. DELETE order_id=100
+
+❌ 잘못된 순서 (파티션 3개, Key 없음):
+1. DELETE order_id=100  ← 먼저 삭제
+2. INSERT order_id=100  ← 나중에 삽입 (순서 역전!)
+3. UPDATE order_id=100  ← 존재하지 않는 데이터 업데이트
+```
+
+### 프로덕션 고려사항: 파티션 증가 (Key 기반 파티셔닝)
+
+**조건**:
+- 처리량 > 10,000 TPS
+- Flink CDC에서 **order_id를 Kafka Message Key로 설정**
+- 같은 order_id는 같은 파티션으로 전송 보장
+
+**Flink CDC 코드 수정 예시** (프로덕션 시):
+```java
+// order_id를 Key로 추출하는 Serializer 구현 필요
+KafkaSink<String> ordersSink = KafkaSink.<String>builder()
+    .setBootstrapServers(CDCConfig.KAFKA_BOOTSTRAP_SERVERS)
+    .setRecordSerializer(
+        KafkaRecordSerializationSchema.builder()
+            .setTopic(CDCConfig.KAFKA_TOPIC_ORDERS)
+            .setKeySerializationSchema(new OrderIdKeySerializer())  // ← Key 추출
+            .setValueSerializationSchema(new SimpleStringSchema())
+            .build()
+    )
+    .build();
+```
+
+**장점**:
+- ✅ 높은 처리량 (병렬 처리)
+- ✅ 확장성 (Consumer 추가 가능)
+- ✅ 같은 order_id는 순서 보장
+
+**단점**:
+- ❌ 구현 복잡도 증가 (Key Serializer 구현)
+- ❌ 파티션 간 순서 보장 안됨 (다른 order_id)
 
 ## 📚 참고 자료
 - [Confluent Kafka Docker 가이드](https://docs.confluent.io/platform/current/installation/docker/config-reference.html)
