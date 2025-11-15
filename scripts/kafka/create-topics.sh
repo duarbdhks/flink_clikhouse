@@ -35,6 +35,7 @@ echo ""
 # Topic 설정
 TOPICS=(
     "orders-cdc-topic"
+    "order-items-cdc-topic"
 )
 
 PARTITIONS=3
