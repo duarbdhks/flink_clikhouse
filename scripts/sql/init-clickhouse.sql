@@ -18,15 +18,15 @@ CREATE TABLE IF NOT EXISTS orders_realtime (
   user_id        UInt64 COMMENT '사용자 ID',
   status         LowCardinality(String) COMMENT '주문 상태 (PENDING/PROCESSING/COMPLETED/CANCELLED)',
   total_amount   Decimal(10, 2) COMMENT '총 주문 금액',
-  order_date     DateTime COMMENT '주문 생성 일시',
+  created_at     DateTime COMMENT '주문 생성 일시',
   updated_at     DateTime COMMENT '마지막 수정 일시',
   deleted_at     Nullable(DateTime) COMMENT 'Soft Delete 일시 (NULL=활성)',
   cdc_op         LowCardinality(String) COMMENT 'CDC 작업 타입 (c=create, u=update, d=delete)',
   cdc_ts_ms      UInt64 COMMENT 'CDC 타임스탬프 (밀리초)',
   sync_timestamp DateTime DEFAULT now() COMMENT '동기화 타임스탬프'
 )
-  ENGINE = ReplacingMergeTree(updated_at) PARTITION BY toYYYYMM(order_date)
-    ORDER BY (id, user_id, order_date)
+  ENGINE = ReplacingMergeTree(updated_at) PARTITION BY toYYYYMM(created_at)
+    ORDER BY (id, user_id, created_at)
     SETTINGS index_granularity = 8192
     COMMENT '실시간 주문 데이터 (CDC 동기화)';
 
@@ -107,7 +107,7 @@ GROUP BY sale_date, oi.product_id;
 -- 집계 테이블 생성
 CREATE TABLE IF NOT EXISTS customer_segments (
   user_id             UInt64 COMMENT '사용자 ID',
-  last_order_date     DateTime COMMENT '최근 주문 일시',
+  last_created_at     DateTime COMMENT '최근 주문 생성 일시',
   total_orders        UInt32 COMMENT '총 주문 건수',
   total_spent         Decimal(18, 2) COMMENT '총 구매 금액 (LTV)',
   avg_order_value     Decimal(10, 2) COMMENT '평균 주문 금액',
@@ -127,7 +127,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS mv_customer_segments
   TO customer_segments
 AS
 SELECT o.user_id,
-       max(o.order_date)                       AS last_order_date,
+       max(o.created_at)                       AS last_created_at,
        count(DISTINCT o.id)                    AS total_orders,
        sum(o.total_amount)                     AS total_spent,
        avg(o.total_amount)                     AS avg_order_value,
@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS hourly_sales_by_product (
   product_id     UInt64 COMMENT '상품 ID',
   product_name   String COMMENT '상품명',
   order_count    AggregateFunction(count, UInt64) COMMENT '주문 건수',
-  total_quantity AggregateFunction(sum, UInt64) COMMENT '판매 수량',
+  total_quantity AggregateFunction(sum, UInt32) COMMENT '판매 수량',
   total_revenue  AggregateFunction(sum, Decimal(18, 2)) COMMENT '총 매출',
   avg_price      AggregateFunction(avg, Decimal(10, 2)) COMMENT '평균 단가'
 )
@@ -189,7 +189,7 @@ GROUP BY hour_timestamp, oi.product_id;
 
 -- 집계 테이블 생성
 CREATE TABLE IF NOT EXISTS cart_analytics (
-  order_date          Date COMMENT '주문 날짜',
+  created_at          Date COMMENT '주문 생성 날짜',
   avg_items_per_order Decimal(10, 2) COMMENT '주문당 평균 상품 수',
   avg_order_value     Decimal(10, 2) COMMENT '평균 주문 금액',
   avg_item_price      Decimal(10, 2) COMMENT '평균 상품 단가',
@@ -198,15 +198,15 @@ CREATE TABLE IF NOT EXISTS cart_analytics (
   completion_rate     Decimal(5, 2) COMMENT '주문 완료율 (%)',
   updated_at          DateTime DEFAULT now()
 )
-  ENGINE = ReplacingMergeTree(updated_at) PARTITION BY toYYYYMM(order_date)
-    ORDER BY order_date SETTINGS index_granularity = 8192
+  ENGINE = ReplacingMergeTree(updated_at) PARTITION BY toYYYYMM(created_at)
+    ORDER BY created_at SETTINGS index_granularity = 8192
     COMMENT '장바구니 및 주문 완료율 분석';
 
 -- Materialized View 생성
 CREATE MATERIALIZED VIEW IF NOT EXISTS mv_cart_analytics
   TO cart_analytics
 AS
-SELECT toDate(o.order_date)                                             AS order_date,
+SELECT toDate(o.created_at)                                             AS created_at,
        avg(item_counts.item_count)                                      AS avg_items_per_order,
        avg(o.total_amount)                                              AS avg_order_value,
        avg(oi.price)                                                    AS avg_item_price,
@@ -223,7 +223,7 @@ LEFT JOIN (SELECT order_id, count() AS item_count
            GROUP BY order_id) AS item_counts ON o.id = item_counts.order_id
 WHERE o.cdc_op != 'd'
   AND o.deleted_at IS NULL
-GROUP BY order_date;
+GROUP BY created_at;
 
 -- ============================================
 -- 샘플 쿼리 (테스트 및 검증용)
@@ -256,15 +256,15 @@ GROUP BY order_date;
 --     (countIf(o.status = 'COMPLETED') * 100.0 / count(DISTINCT o.id)) AS completion_rate
 -- FROM orders_realtime o
 -- LEFT JOIN order_items_realtime oi ON o.id = oi.order_id
--- WHERE toDate(o.order_date) = today()
+-- WHERE toDate(o.created_at) = today()
 --   AND o.cdc_op != 'd';
 
 -- 3. 고객 세그먼트 분류 (Hot/Warm/Cold/Churned)
 -- SELECT
 --     CASE
---         WHEN dateDiff('day', last_order_date, now()) <= 7 THEN 'Hot'
---         WHEN dateDiff('day', last_order_date, now()) <= 30 THEN 'Warm'
---         WHEN dateDiff('day', last_order_date, now()) <= 90 THEN 'Cold'
+--         WHEN dateDiff('day', last_created_at, now()) <= 7 THEN 'Hot'
+--         WHEN dateDiff('day', last_created_at, now()) <= 30 THEN 'Warm'
+--         WHEN dateDiff('day', last_created_at, now()) <= 90 THEN 'Cold'
 --         ELSE 'Churned'
 --     END AS segment,
 --     count() AS customer_count,
@@ -289,13 +289,13 @@ GROUP BY order_date;
 
 -- 5. 장바구니 트렌드 (최근 7일)
 -- SELECT
---     order_date,
+--     created_at,
 --     avg_items_per_order,
 --     avg_order_value,
 --     completion_rate
 -- FROM cart_analytics
--- WHERE order_date >= today() - INTERVAL 7 DAY
--- ORDER BY order_date DESC;
+-- WHERE created_at >= today() - INTERVAL 7 DAY
+-- ORDER BY created_at DESC;
 
 -- ============================================
 -- 테이블 정보 확인

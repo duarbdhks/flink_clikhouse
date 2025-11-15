@@ -7,6 +7,22 @@
 SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
 
+-- ============================================
+-- CDC 사용자 생성 및 권한 부여
+-- ============================================
+
+-- CDC 전용 사용자 생성 (모든 호스트에서 접속 가능)
+CREATE USER IF NOT EXISTS 'cdc'@'%' IDENTIFIED BY 'test123';
+
+-- Binlog 읽기 권한 (CDC에 필수)
+GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc'@'%';
+
+-- order_db 데이터베이스 읽기 권한
+GRANT SELECT ON order_db.* TO 'cdc'@'%';
+
+-- 권한 즉시 적용
+FLUSH PRIVILEGES;
+
 -- 데이터베이스 생성
 CREATE DATABASE IF NOT EXISTS order_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE order_db;
@@ -56,12 +72,12 @@ CREATE TABLE IF NOT EXISTS orders (
   user_id      BIGINT         NOT NULL COMMENT '사용자 ID',
   status       VARCHAR(20)    NOT NULL DEFAULT 'PENDING' COMMENT '주문 상태 (PENDING, PROCESSING, COMPLETED, CANCELLED)',
   total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT '총 주문 금액',
-  order_date   TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '주문 생성 일시',
+  created_at   TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '주문 생성 일시',
   updated_at   TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '마지막 수정 일시',
   deleted_at   TIMESTAMP      NULL     DEFAULT NULL COMMENT 'Soft Delete 일시 (NULL=활성)',
   INDEX idx_user_id (user_id),
   INDEX idx_status (status),
-  INDEX idx_order_date (order_date),
+  INDEX idx_created_at (created_at),
   INDEX idx_deleted_at (deleted_at)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
@@ -86,21 +102,6 @@ CREATE TABLE IF NOT EXISTS order_items (
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='주문 상세 항목 테이블';
-
--- ============================================
--- CDC 사용자 생성 및 권한 부여
--- ============================================
-
--- CDC 전용 사용자 생성
-CREATE USER IF NOT EXISTS 'cdc'@'%' IDENTIFIED BY 'test123';
-
--- CDC에 필요한 권한 부여
-GRANT SELECT, RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'cdc'@'%';
-
--- order_db에 대한 모든 권한 부여
-GRANT ALL PRIVILEGES ON order_db.* TO 'cdc'@'%';
-
-FLUSH PRIVILEGES;
 
 -- ============================================
 -- 샘플 데이터 삽입
@@ -179,7 +180,7 @@ VALUES
 -- ============================================
 
 -- 주문 1: 전자제품 구매
-INSERT INTO orders (user_id, status, total_amount, order_date)
+INSERT INTO orders (user_id, status, total_amount, created_at)
 VALUES (101, 'COMPLETED', 1799000.00, '2025-01-10 09:15:30');
 
 INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
@@ -188,7 +189,7 @@ VALUES (LAST_INSERT_ID(), 1001, '삼성 갤럭시 S24', 1, 1299000.00, 1299000.0
        (LAST_INSERT_ID(), 1003, '무선충전기', 1, 50000.00, 50000.00);
 
 -- 주문 2: 노트북 구매
-INSERT INTO orders (user_id, status, total_amount, order_date)
+INSERT INTO orders (user_id, status, total_amount, created_at)
 VALUES (102, 'PROCESSING', 2190000.00, '2025-01-10 10:22:15');
 
 INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
@@ -197,7 +198,7 @@ VALUES (LAST_INSERT_ID(), 2001, 'MacBook Air M3', 1, 1690000.00, 1690000.00),
        (LAST_INSERT_ID(), 2003, 'USB-C 허브', 1, 150000.00, 150000.00);
 
 -- 주문 3: 의류 구매
-INSERT INTO orders (user_id, status, total_amount, order_date)
+INSERT INTO orders (user_id, status, total_amount, created_at)
 VALUES (103, 'PENDING', 289000.00, '2025-01-10 11:45:20');
 
 INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
@@ -205,14 +206,14 @@ VALUES (LAST_INSERT_ID(), 3001, '겨울 패딩 점퍼', 1, 189000.00, 189000.00)
        (LAST_INSERT_ID(), 3002, '기모 맨투맨', 2, 50000.00, 100000.00);
 
 -- 주문 4: 가전제품 구매
-INSERT INTO orders (user_id, status, total_amount, order_date)
+INSERT INTO orders (user_id, status, total_amount, created_at)
 VALUES (104, 'COMPLETED', 456000.00, '2025-01-10 13:10:05');
 
 INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
 VALUES (LAST_INSERT_ID(), 4001, 'LG 스탠바이미', 1, 456000.00, 456000.00);
 
 -- 주문 5: 도서 구매
-INSERT INTO orders (user_id, status, total_amount, order_date)
+INSERT INTO orders (user_id, status, total_amount, created_at)
 VALUES (105, 'COMPLETED', 87500.00, '2025-01-10 14:35:40');
 
 INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
@@ -221,14 +222,14 @@ VALUES (LAST_INSERT_ID(), 5001, 'Effective Java 3판', 1, 36000.00, 36000.00),
        (LAST_INSERT_ID(), 5003, 'HTTP 완벽 가이드', 1, 18500.00, 18500.00);
 
 -- 주문 6: 생활용품 구매
-INSERT INTO orders (user_id, status, total_amount, order_date)
+INSERT INTO orders (user_id, status, total_amount, created_at)
 VALUES (106, 'PROCESSING', 135000.00, '2025-01-10 15:20:18');
 
 INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
 VALUES (LAST_INSERT_ID(), 6001, '다이슨 청소기', 1, 135000.00, 135000.00);
 
 -- 주문 7: 스포츠용품 구매
-INSERT INTO orders (user_id, status, total_amount, order_date)
+INSERT INTO orders (user_id, status, total_amount, created_at)
 VALUES (101, 'COMPLETED', 234000.00, '2025-01-10 16:05:50');
 
 INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
@@ -237,7 +238,7 @@ VALUES (LAST_INSERT_ID(), 7001, '나이키 운동화', 1, 149000.00, 149000.00),
        (LAST_INSERT_ID(), 7003, '덤벨 세트', 1, 40000.00, 40000.00);
 
 -- 주문 8: 화장품 구매
-INSERT INTO orders (user_id, status, total_amount, order_date)
+INSERT INTO orders (user_id, status, total_amount, created_at)
 VALUES (107, 'PENDING', 178000.00, '2025-01-10 17:40:22');
 
 INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
@@ -245,14 +246,14 @@ VALUES (LAST_INSERT_ID(), 8001, '에스티로더 세럼', 1, 89000.00, 89000.00)
        (LAST_INSERT_ID(), 8002, '설화수 토너', 1, 89000.00, 89000.00);
 
 -- 주문 9: 식품 구매
-INSERT INTO orders (user_id, status, total_amount, order_date)
+INSERT INTO orders (user_id, status, total_amount, created_at)
 VALUES (108, 'CANCELLED', 52000.00, '2025-01-10 18:15:30');
 
 INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
 VALUES (LAST_INSERT_ID(), 9001, '한우 세트', 1, 52000.00, 52000.00);
 
 -- 주문 10: 가구 구매
-INSERT INTO orders (user_id, status, total_amount, order_date)
+INSERT INTO orders (user_id, status, total_amount, created_at)
 VALUES (109, 'PROCESSING', 899000.00, '2025-01-10 19:30:45');
 
 INSERT INTO order_items (order_id, product_id, product_name, quantity, price, subtotal)
@@ -290,7 +291,7 @@ SELECT o.id as order_id,
        u.email,
        o.status,
        o.total_amount,
-       o.order_date,
+       o.created_at,
        oi.product_name,
        oi.quantity,
        oi.price,
@@ -298,7 +299,7 @@ SELECT o.id as order_id,
 FROM orders o
 INNER JOIN users u ON o.user_id = u.id
 INNER JOIN order_items oi ON o.id = oi.order_id
-ORDER BY o.order_date DESC
+ORDER BY o.created_at DESC
 LIMIT 20;
 
 SELECT '✅ MySQL 초기화 완료: 9명 사용자, 20개 상품, 10개 주문, 18개 주문항목 생성됨' as status;
