@@ -1,5 +1,6 @@
 package com.flink.cdc.config;
 
+import com.flink.common.config.ConfigLoader;
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
