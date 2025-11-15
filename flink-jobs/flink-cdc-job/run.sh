@@ -354,9 +354,9 @@ print_info "실행 완료!"
 if [ "$FLINK_MODE" = "docker" ]; then
     echo ""
     print_info "Flink Web UI: http://localhost:8081"
-    print_info "Job 목록 확인: ./run-cdc-job.sh -l"
-    print_info "Job 중지: ./run-cdc-job.sh -c <job-id>"
-    print_info "재시작: ./run-cdc-job.sh -r"
+    print_info "Job 목록 확인: ./run.sh -l"
+    print_info "Job 중지: ./run.sh -c <job-id>"
+    print_info "재시작: ./run.sh -r"
 elif [ "$FLINK_MODE" != "local" ]; then
     echo ""
     print_info "Flink Web UI: http://localhost:8081"

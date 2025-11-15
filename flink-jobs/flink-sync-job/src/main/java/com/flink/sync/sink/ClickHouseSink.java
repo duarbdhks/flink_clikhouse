@@ -1,5 +1,6 @@
 package com.flink.sync.sink;
 
+import com.flink.common.config.ConfigLoader;
 import com.flink.sync.transform.ClickHouseRow;
 import org.apache.flink.connector.jdbc.JdbcConnectionOptions;
 import org.apache.flink.connector.jdbc.JdbcExecutionOptions;
@@ -13,12 +14,16 @@ import java.sql.SQLException;
 /**
  * ClickHouse Sink 설정
  * ClickHouse orders_realtime 테이블에 데이터를 삽입합니다.
+ * <p>
+ * application.properties 파일에서 설정을 동적으로 읽어옵니다.
  */
 public class ClickHouseSink {
 
-    private static final String CLICKHOUSE_URL = "jdbc:clickhouse://clickhouse:8123/order_analytics";
-    private static final String CLICKHOUSE_USER = "admin";
-    private static final String CLICKHOUSE_PASSWORD = "test123";
+    // ClickHouse Sink 설정 (application.properties에서 로드)
+    private static final String CLICKHOUSE_URL = ConfigLoader.get("clickhouse.url");
+    private static final String CLICKHOUSE_DRIVER = ConfigLoader.get("clickhouse.driver");
+    private static final String CLICKHOUSE_USER = ConfigLoader.get("clickhouse.username");
+    private static final String CLICKHOUSE_PASSWORD = ConfigLoader.get("clickhouse.password");
 
     /**
      * Orders 테이블을 위한 ClickHouse Sink 생성
@@ -31,17 +36,21 @@ public class ClickHouseSink {
                 "cdc_op, cdc_ts_ms, sync_timestamp" +
                 ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())";
 
+        int batchSize = ConfigLoader.getInt("clickhouse.batch.size", 1000);
+        long batchIntervalMs = ConfigLoader.getLong("clickhouse.batch.interval.ms", 5000L);
+        int maxRetries = ConfigLoader.getInt("clickhouse.max.retries", 3);
+
         return JdbcSink.sink(
                 insertSQL,
                 new OrdersStatementBuilder(),
                 JdbcExecutionOptions.builder()
-                                    .withBatchSize(1000)           // 1000건씩 배치 insert
-                                    .withBatchIntervalMs(5000L)    // 최대 5초 대기
-                                    .withMaxRetries(3)             // 실패 시 3회 재시도
+                                    .withBatchSize(batchSize)              // application.properties에서 로드
+                                    .withBatchIntervalMs(batchIntervalMs)  // application.properties에서 로드
+                                    .withMaxRetries(maxRetries)            // application.properties에서 로드
                                     .build(),
                 new JdbcConnectionOptions.JdbcConnectionOptionsBuilder()
                         .withUrl(CLICKHOUSE_URL)
-                        .withDriverName("com.clickhouse.jdbc.ClickHouseDriver")
+                        .withDriverName(CLICKHOUSE_DRIVER)
                         .withUsername(CLICKHOUSE_USER)
                         .withPassword(CLICKHOUSE_PASSWORD)
                         .build()
@@ -75,17 +84,21 @@ public class ClickHouseSink {
                 "cdc_op, cdc_ts_ms, sync_timestamp" +
                 ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())";
 
+        int fastBatchSize = ConfigLoader.getInt("clickhouse.fast.batch.size", 100);
+        long fastBatchIntervalMs = ConfigLoader.getLong("clickhouse.fast.batch.interval.ms", 1000L);
+        int maxRetries = ConfigLoader.getInt("clickhouse.max.retries", 3);
+
         return JdbcSink.sink(
                 insertSQL,
                 new OrdersStatementBuilder(),
                 JdbcExecutionOptions.builder()
-                                    .withBatchSize(100)            // 100건씩 배치
-                                    .withBatchIntervalMs(1000L)    // 1초 간격
-                                    .withMaxRetries(3)
+                                    .withBatchSize(fastBatchSize)              // application.properties에서 로드
+                                    .withBatchIntervalMs(fastBatchIntervalMs)  // application.properties에서 로드
+                                    .withMaxRetries(maxRetries)
                                     .build(),
                 new JdbcConnectionOptions.JdbcConnectionOptionsBuilder()
                         .withUrl(CLICKHOUSE_URL)
-                        .withDriverName("com.clickhouse.jdbc.ClickHouseDriver")
+                        .withDriverName(CLICKHOUSE_DRIVER)
                         .withUsername(CLICKHOUSE_USER)
                         .withPassword(CLICKHOUSE_PASSWORD)
                         .build()

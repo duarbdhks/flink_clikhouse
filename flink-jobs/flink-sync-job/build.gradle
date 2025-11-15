@@ -2,6 +2,7 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
+version = '1.0.0'
 description = 'Flink Sync Job - Kafka to ClickHouse'
 
 dependencies {
