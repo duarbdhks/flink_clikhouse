@@ -127,7 +127,7 @@ public class DeduplicationFunction extends KeyedProcessFunction<String, ClickHou
 
 ```java
 DataStream<ClickHouseRow> deduplicatedStream = clickHouseRowStream
-    .keyBy(row -> row.getId() + "_" + row.getCdcTsMs()) // (id, cdc_ts_ms) 조합으로 그룹화
+    .keyBy(row -> String.valueOf(row.getId())) // id만 사용 (cdc_ts_ms는 매번 다름)
     .process(new DeduplicationFunction(60)) // 60초 State TTL
     .uid("deduplication")
     .name("Deduplication Filter");
@@ -136,7 +136,15 @@ DataStream<ClickHouseRow> deduplicatedStream = clickHouseRowStream
 **효과**:
 - ClickHouse 삽입 **전에** 애플리케이션 레벨에서 중복 필터링
 - 60초 State TTL로 메모리 효율성 보장
-- 동일한 (id, cdc_ts_ms) 이벤트는 한 번만 ClickHouse로 전달
+- 동일 id의 중복 이벤트는 한 번만 ClickHouse로 전달
+
+**중요**: Keying 전략
+- ✅ **올바름**: `keyBy(row -> String.valueOf(row.getId()))`
+  - 같은 주문(id)의 중복 이벤트를 하나의 키로 그룹화
+  - 첫 번째 이벤트만 ClickHouse에 삽입, 나머지는 필터링
+- ❌ **잘못됨**: `keyBy(row -> row.getId() + "_" + row.getCdcTsMs())`
+  - cdc_ts_ms가 매번 다르므로 서로 다른 키로 인식
+  - 중복 필터링 완전히 실패
 
 ---
 
@@ -165,14 +173,195 @@ String insertSQL = "INSERT INTO orders_realtime (id, user_id, status, total_amou
 - ✅ **LATEST Fallback**: 첫 실행 시 최신 메시지부터 소비
 
 ### Layer 2: 애플리케이션 레벨 필터링
-- ✅ **Flink State 기반 중복 제거**: (id, cdc_ts_ms) 조합으로 필터링
+- ✅ **Flink State 기반 중복 제거**: id 기준 필터링 (cdc_ts_ms는 키로 부적합)
 - ✅ **State TTL (60초)**: 메모리 효율성 보장
 - ✅ **ClickHouse 삽입 전 필터링**: 불필요한 네트워크/디스크 I/O 방지
+
+**중요**: DeduplicationFunction의 keying 전략
+- `keyBy(row -> String.valueOf(row.getId()))`: ✅ id만 사용
+- `keyBy(row -> row.getId() + "_" + row.getCdcTsMs())`: ❌ 중복 제거 실패
+- **이유**: cdc_ts_ms는 매번 다른 값 → 서로 다른 키로 인식 → 중복 필터링 불가
 
 ### Layer 3: ClickHouse 저장소 레벨
 - ✅ **ReplacingMergeTree(cdc_ts_ms)**: CDC 타임스탬프 기반 버전 관리
 - ✅ **ORDER BY (id)**: id 기반 중복 그룹화 (cdc_ts_ms는 버전 선택 기준)
 - ✅ **백그라운드 머지**: 비동기로 중복 데이터 제거 (최신 cdc_ts_ms 유지)
+
+---
+
+## 자동 복구 메커니즘 (Checkpoint Recovery)
+
+### 개요
+
+Docker restart 시 Flink Job이 자동으로 checkpoint에서 복구되도록 구성하여 완전한 멱등성을 보장합니다.
+
+### 구현 방식
+
+#### 1. Checkpoint 기반 자동 복구 (`submit-jobs.sh`)
+
+**동작 원리**:
+```bash
+1. JobManager 준비 대기
+   ↓
+2. 기존 checkpoint 검색 (/tmp/flink-checkpoints)
+   ↓
+3. Checkpoint 발견?
+   ├─ Yes → `-s <checkpoint-path>` 옵션으로 복구 시도
+   │         ├─ 성공 → MySQL binlog offset, Kafka offset, State 모두 복구 ✅
+   │         └─ 실패 → 새로 시작 (빈 state)
+   └─ No  → 새로 시작
+```
+
+**핵심 로직**:
+```bash
+# 가장 최근 checkpoint 찾기
+find_latest_checkpoint() {
+  find /tmp/flink-checkpoints -type d -name "chk-*" | \
+    xargs -I {} stat -f "%m %N" {} | \
+    sort -rn | head -1 | awk '{print $2}'
+}
+
+# Checkpoint에서 복구
+if [ -n "$CHECKPOINT" ]; then
+  flink run -d -s "$CHECKPOINT" -c com.flink.cdc.job.MySQLCDCJob ...
+else
+  flink run -d -c com.flink.cdc.job.MySQLCDCJob ...
+fi
+```
+
+#### 2. Docker Restart 정책 (`docker-compose.yml`)
+
+**변경 내역**:
+```yaml
+# Before
+restart: "no"  # 한 번만 실행 후 종료
+
+# After
+restart: unless-stopped  # Docker restart 시 자동 실행
+```
+
+**효과**:
+- ✅ `docker-compose restart` 시 flink-job-submitter가 자동 재실행
+- ✅ submit-jobs.sh가 checkpoint 검색 및 복구 수행
+- ✅ 수동 개입 불필요
+
+### Docker Restart 시나리오
+
+#### 시나리오 1: Checkpoint 있음 (정상 복구)
+
+```
+1. docker-compose restart
+   ↓
+2. flink-job-submitter 자동 재시작
+   ↓
+3. submit-jobs.sh 실행
+   ↓
+4. Checkpoint 발견: /tmp/flink-checkpoints/.../chk-123
+   ↓
+5. CDC Job 복구:
+   - MySQL binlog offset 복구 ✅
+   - 마지막 읽은 위치부터 재개
+   ↓
+6. Sync Job 복구:
+   - Kafka offset 복구 ✅
+   - DeduplicationFunction state 복구 ✅
+   - 마지막 처리한 위치부터 재개
+   ↓
+7. 결과: 중복 데이터 없음 ✅
+```
+
+#### 시나리오 2: Checkpoint 없음 (첫 실행)
+
+```
+1. 첫 실행 또는 checkpoint 삭제됨
+   ↓
+2. Checkpoint 없음 → 새로 시작
+   ↓
+3. CDC Job: MySQL snapshot 실행
+   ↓
+4. Sync Job: Kafka LATEST offset부터 소비
+   ↓
+5. 결과: 과거 데이터는 처리 안 됨
+```
+
+### HA 모드와의 차이점
+
+| 항목 | Checkpoint 복구 (현재) | HA 모드 (Production) |
+|------|------------------------|---------------------|
+| **자동 복구** | ✅ Docker restart 시 | ✅ Job 실패 시에도 |
+| **복잡도** | 낮음 ⭐ | 높음 ⭐⭐⭐ (ZooKeeper 필요) |
+| **MVP 적합성** | ✅ | ❌ |
+| **Production 권장** | △ (수동 재시작 필요) | ✅ |
+| **추가 인프라** | 없음 | ZooKeeper 또는 Kubernetes |
+
+### 제약사항
+
+#### 1. Job 실패 시 수동 재시작 필요
+
+**현재 구조**:
+- Docker restart → 자동 복구 ✅
+- Job 실패 (exception) → 수동 재시작 필요 ⚠️
+
+**HA 모드와의 차이**:
+- HA 모드는 Job 실패 시에도 자동으로 checkpoint에서 재시작
+
+**해결 방법**:
+```bash
+# Job 상태 모니터링 스크립트 (선택사항)
+watch -n 30 'docker exec yeumgw-flink-jobmanager flink list'
+```
+
+#### 2. Checkpoint 호환성
+
+**주의사항**:
+- Operator UID 변경 시 checkpoint 복구 실패
+- State 스키마 변경 시 호환성 문제 가능
+
+**현재 설정 (안전)**:
+```java
+// 모든 operator에 고정 UID 지정됨
+.uid("kafka-cdc-source")
+.uid("cdc-transformer")
+.uid("deduplication")
+.uid("clickhouse-sink")
+```
+
+#### 3. Checkpoint 저장 기간
+
+**현재 설정**:
+- Externalized checkpoint: Job 취소 시에도 보존
+- 수동 삭제 필요
+
+**권장 사항**:
+```bash
+# 오래된 checkpoint 정리 (예: 7일 이상)
+find ./docker/volumes/flink-checkpoints -type d -mtime +7 -exec rm -rf {} \;
+```
+
+### Production 권장사항
+
+#### 최소 구성 (현재 + 모니터링)
+```yaml
+1. Checkpoint 복구 ✅ (구현됨)
+2. Health Check 추가
+3. 알림 시스템 (Slack, PagerDuty)
+```
+
+#### 표준 구성 (HA 모드)
+```yaml
+1. Flink Standalone HA (ZooKeeper)
+2. Checkpoint 복구 ✅
+3. 자동 재시작
+4. 모니터링 + 알림
+```
+
+#### Enterprise 구성
+```yaml
+1. Kubernetes + Flink Operator
+2. Auto-scaling
+3. 분산 Checkpoint Storage (S3, HDFS)
+4. 메트릭 + 로깅 (Prometheus, Grafana)
+```
 
 ---
 

@@ -31,7 +31,7 @@ cd "$PROJECT_ROOT"
 
 if ! docker-compose ps | grep -q "Up"; then
     echo -e "${YELLOW}⏳ 서비스 시작 중...${NC}"
-    docker-compose up -d mysql clickhouse kafka
+    docker-compose up -d
     echo -e "${GREEN}✅ 서비스 시작 완료${NC}"
 else
     echo -e "${GREEN}✅ 서비스가 이미 실행 중입니다${NC}"

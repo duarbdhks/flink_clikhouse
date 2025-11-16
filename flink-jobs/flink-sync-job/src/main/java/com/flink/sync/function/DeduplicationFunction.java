@@ -14,15 +14,15 @@ import org.slf4j.LoggerFactory;
  * 중복 제거 함수 (Deduplication Function)
  * CDC 이벤트의 중복을 필터링하여 ClickHouse에 동일한 데이터가 반복 삽입되는 것을 방지합니다.
  * 동작 원리:
- * 1. KeyBy를 통해 (id, cdc_ts_ms) 조합으로 이벤트를 그룹화
+ * 1. KeyBy를 통해 id로 이벤트를 그룹화
  * 2. ValueState를 사용하여 이미 처리된 이벤트인지 확인
  * 3. 처음 보는 이벤트만 다음 단계로 전달
  * 4. State TTL(Time-To-Live)을 설정하여 메모리 효율성 보장
  * 사용 예시:
  * <pre>
  * DataStream<ClickHouseRow> deduplicated = clickHouseRowStream
- *     .keyBy(row -> row.getId() + "_" + row.getCdcTsMs())
- *     .process(new DeduplicationFunction(60)); // 60초 TTL
+ *     .keyBy(row -> String.valueOf(row.getId()))
+ *     .process(new DeduplicationFunction(600)); // 600초 (10분) TTL - Production 권장
  * </pre>
  */
 public class DeduplicationFunction extends KeyedProcessFunction<String, ClickHouseRow, ClickHouseRow> {
@@ -40,7 +40,8 @@ public class DeduplicationFunction extends KeyedProcessFunction<String, ClickHou
      *
      * @param stateTtlSeconds State 보관 시간 (초).
      *                        이 시간이 지나면 State가 삭제되어 메모리 효율성 보장.
-     *                        권장값: 60초 (1분) - CDC 이벤트는 대부분 수초 내에 도착
+     *                        권장값: 600초 (10분) - Production 표준 (네트워크 지연, 재시도, restart 고려)
+     *                        개발 환경: 60초도 가능하지만 restart 시 중복 발생 가능
      */
     public DeduplicationFunction(int stateTtlSeconds) {
         this.stateTtlSeconds = stateTtlSeconds;

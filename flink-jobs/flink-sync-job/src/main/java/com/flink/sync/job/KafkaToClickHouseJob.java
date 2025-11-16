@@ -64,8 +64,8 @@ public class KafkaToClickHouseJob {
 
         // 8. 중복 제거 (Deduplication) - ClickHouse 삽입 전 애플리케이션 레벨 필터링
         DataStream<ClickHouseRow> deduplicatedStream = clickHouseRowStream
-                .keyBy(row -> row.getId() + "_" + row.getCdcTsMs()) // (id, cdc_ts_ms) 조합으로 그룹화
-                .process(new DeduplicationFunction(60)) // 60초 State TTL
+                .keyBy(row -> String.valueOf(row.getId())) // id 사용
+                .process(new DeduplicationFunction(600)) // 600초 (10분) State TTL - Production 표준
                 .uid("deduplication")
                 .name("Deduplication Filter");
 
@@ -75,7 +75,7 @@ public class KafkaToClickHouseJob {
                 .uid("clickhouse-sink")
                 .name("ClickHouse Orders Sink");
 
-        LOG.info("✅ ClickHouse Sink 생성 완료 (중복 제거 활성화)");
+        LOG.info("✅ ClickHouse Sink 생성 완료 (중복 제거 활성화: State TTL 600초)");
 
         // 10. Job 실행
         LOG.info("🚀 Kafka to ClickHouse Sync Job 시작...");
@@ -91,16 +91,16 @@ public class KafkaToClickHouseJob {
      * Checkpoint 설정 (Exactly-Once 보장)
      */
     private static void configureCheckpointing(StreamExecutionEnvironment env) {
-        // Checkpoint 간격: 60초
-        env.enableCheckpointing(60000L);
+        // Checkpoint 간격: 30초 (Production 표준: 장애 복구 시 데이터 손실 창 최소화)
+        env.enableCheckpointing(30000L);
 
         CheckpointConfig checkpointConfig = env.getCheckpointConfig();
 
         // Checkpoint 모드: EXACTLY_ONCE
         checkpointConfig.setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE);
 
-        // Checkpoint 간 최소 간격: 30초
-        checkpointConfig.setMinPauseBetweenCheckpoints(30000L);
+        // Checkpoint 간 최소 간격: 15초
+        checkpointConfig.setMinPauseBetweenCheckpoints(15000L);
 
         // Checkpoint 타임아웃: 10분
         checkpointConfig.setCheckpointTimeout(600000L);
@@ -116,11 +116,12 @@ public class KafkaToClickHouseJob {
         // 허용 가능한 Checkpoint 실패 횟수: 3회
         checkpointConfig.setTolerableCheckpointFailureNumber(3);
 
-        // Checkpoint 스토리지 설정: 파일 시스템 기반 (Job 재시작 시 복구 가능)
+        // Checkpoint 스토리지 설정: Sync Job 전용 디렉토리
         // Docker 볼륨: ./docker/volumes/flink-checkpoints:/tmp/flink-checkpoints
-        checkpointConfig.setCheckpointStorage("file:///tmp/flink-checkpoints");
+        // Job별 경로 분리로 checkpoint 혼용 방지 (CDC와 Sync는 다른 operator UID 사용)
+        checkpointConfig.setCheckpointStorage("file:///tmp/flink-checkpoints/sync");
 
-        LOG.info("✅ Checkpoint 설정 완료: interval=60s, mode=EXACTLY_ONCE, storage=file:///tmp/flink-checkpoints");
+        LOG.info("✅ Checkpoint 설정 완료: interval=30s, minPause=15s, mode=EXACTLY_ONCE, storage=file:///tmp/flink-checkpoints/sync");
     }
 
     /**

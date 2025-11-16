@@ -213,10 +213,12 @@ services:
     volumes:
       - ./flink-jobs:/opt/flink/jobs
       - ./docker/init/flink/submit-jobs.sh:/submit-jobs.sh
+      - ./docker/volumes/flink-checkpoints:/tmp/flink-checkpoints  # Checkpoint 복구를 위한 volume
+      - ./docker/volumes/flink-savepoints:/tmp/flink-savepoints    # Savepoint 복구를 위한 volume
     command: bash /submit-jobs.sh
     networks:
       - cdc-network
-    restart: "no"  # 한 번만 실행 후 종료
+    restart: unless-stopped  # Docker restart 시 자동 실행 (checkpoint 복구)
 
   # ========================================
   # Kafka UI (Optional - 모니터링용)
