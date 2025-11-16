@@ -104,9 +104,65 @@ docker exec -it yeumgw-flink-jobmanager flink run -d \
 - `order_items`: 주문 상품 (id, order_id, product_id, quantity, price)
 
 ### ClickHouse (`order_analytics`)
-- `orders_realtime`: 주문 실시간 분석 테이블 (MergeTree)
-  - CDC 메타데이터 포함: `operation_type`, `event_time`
-  - Materialized View로 집계 뷰 지원
+
+#### 스키마 설계 원칙
+1. **Raw 데이터**: 모든 CDC 이벤트 저장 (deleted_at 포함)
+2. **Aggregation**: 전체 데이터 집계 (MV에서 deleted_at 필터링 안 함)
+3. **Query**: 조회 시점에 Active View로 deleted_at 필터링
+
+#### Raw 테이블 (ReplacingMergeTree)
+- `orders_realtime`: 주문 실시간 데이터
+  - 엔진: `ReplacingMergeTree(cdc_ts_ms)`
+  - ORDER BY: `(id)` - id 기반 중복 제거
+  - 파티션: `toYYYYMM(created_at)`
+  - CDC 메타데이터: `cdc_op`, `cdc_ts_ms`, `deleted_at`
+
+- `order_items_realtime`: 주문 항목 실시간 데이터
+  - 엔진: `ReplacingMergeTree(cdc_ts_ms)`
+  - ORDER BY: `(id)`
+  - 파티션: `toYYYYMM(created_at)`
+
+#### 집계 테이블 (MergeTree Variants)
+- `product_daily_stats`: 상품 일별 판매 통계
+  - 엔진: `SummingMergeTree((order_count, total_quantity, total_revenue, unique_customers))`
+  - ORDER BY: `(sale_date, product_id)`
+
+- `customer_segments`: 고객 세그먼트 분석
+  - 엔진: `AggregatingMergeTree()` (State/Merge 함수 사용)
+  - ORDER BY: `(user_id)`
+  - 컬럼 타입: `AggregateFunction(count|sum|countIf, ...)`
+
+- `cart_analytics`: 장바구니 분석
+  - 엔진: `SummingMergeTree((total_orders, completed_orders))`
+  - ORDER BY: `(created_at)`
+
+- `hourly_sales_by_product`: 시간별 상품 매출
+  - 엔진: `AggregatingMergeTree()`
+  - ORDER BY: `(hour_timestamp, product_id)`
+  - 집계 함수: `countState`, `sumState`, `avgState`
+
+#### Materialized Views
+- `mv_product_daily_stats`: orders + order_items 조인하여 일별 통계 생성
+- `mv_customer_segments`: 고객별 구매 패턴 집계
+- `mv_hourly_sales_by_product`: 시간별 판매 데이터 집계
+- `mv_cart_analytics`: 주문 완료율 분석
+
+#### Active View 레이어 (deleted_at 필터링)
+**⚠️ 중요**: 쿼리 시 반드시 `*_active` View를 사용하세요!
+
+- `active_orders_realtime`: 삭제되지 않은 주문만 조회
+- `active_order_items_realtime`: 삭제되지 않은 주문 항목만 조회
+- `product_daily_stats_active`: 활성 주문 기반 상품 통계 (avg_price 계산 포함)
+- `customer_segments_active`: 활성 고객 세그먼트
+  - `*Merge()` 함수로 AggregateFunction 결과 추출
+  - avg_order_value, avg_items_per_order 자동 계산
+- `hourly_sales_active`: 시간별 판매 통계 (집계 함수 머지)
+- `cart_analytics_active`: 장바구니 분석 (completion_rate 계산 포함)
+
+**Active View가 필요한 이유**:
+- MySQL에서 soft delete (UPDATE deleted_at) 시 Materialized View는 반응하지 않음
+- Raw 집계 테이블에는 삭제된 데이터도 포함됨
+- 쿼리 시점에 deleted_at 필터링으로 정확한 통계 제공
 
 ## 테스트 및 검증
 
@@ -127,8 +183,13 @@ docker exec -it yeumgw-kafka kafka-console-consumer \
   --topic orders-cdc --max-messages 1
 
 # 4. ClickHouse 확인 (5초 후)
+# Raw 테이블 확인 (deleted_at 포함)
 docker exec -it yeumgw-clickhouse-server clickhouse-client \
   --query "SELECT * FROM order_analytics.orders_realtime ORDER BY created_at DESC LIMIT 5"
+
+# Active View 확인 (deleted_at 필터링, 프로덕션 권장)
+docker exec -it yeumgw-clickhouse-server clickhouse-client \
+  --query "SELECT * FROM order_analytics.active_orders_realtime ORDER BY created_at DESC LIMIT 5"
 ```
 
 ### 모니터링
@@ -150,6 +211,17 @@ docker exec -it yeumgw-clickhouse-server clickhouse-client \
 - **토픽 라우팅**: `TableRouter.java`의 `OperationTableRouter` 구현 확인
 - **ClickHouse 스키마 변경**: `ClickHouseSink.java`의 `OrdersStatementBuilder` 수정
 - **설정 변경**: `application.properties`에서 DB/Kafka 연결 정보 관리
+
+### ClickHouse (스키마 및 쿼리)
+- **Raw 테이블 수정**: `init-clickhouse.sql`에서 `orders_realtime`, `order_items_realtime` 스키마 변경
+- **집계 테이블 엔진**:
+  - 증분 합산: `SummingMergeTree((컬럼1, 컬럼2, ...))` 사용
+  - 집계 함수: `AggregatingMergeTree()` + `*State()`, `*Merge()` 함수
+  - 중복 제거: `ReplacingMergeTree(버전컬럼)` 사용
+- **⚠️ 쿼리 필수 규칙**: 프로덕션 쿼리는 반드시 `*_active` View 사용
+  - ✅ 올바름: `SELECT * FROM active_orders_realtime`
+  - ❌ 잘못됨: `SELECT * FROM orders_realtime WHERE deleted_at IS NULL`
+- **Materialized View 수정**: deleted_at 필터링 제거, cdc_op != 'd' 필터만 유지
 
 ### Docker Compose
 - **MySQL binlog 필수**: `--log-bin`, `--binlog-format=ROW` 설정 유지
@@ -190,20 +262,38 @@ checkpointConfig.setCheckpointStorage("file:///tmp/flink-checkpoints");
 - ClickHouse 삽입 전 필터링으로 불필요한 I/O 방지
 
 **Layer 3: ClickHouse 저장소 레벨**
-- `ReplacingMergeTree(cdc_ts_ms)`: CDC 타임스탬프 기반 버전 관리
-- `ORDER BY (id)`: id 기반 중복 그룹화 (cdc_ts_ms는 버전 선택 기준)
-- 백그라운드 머지로 비동기 중복 데이터 제거 (최신 cdc_ts_ms 유지)
+- **Raw 테이블**: `ReplacingMergeTree(cdc_ts_ms)` - CDC 타임스탬프 기반 버전 관리
+  - `ORDER BY (id)`: id 기반 중복 그룹화 (cdc_ts_ms는 버전 선택 기준)
+  - 백그라운드 머지로 비동기 중복 데이터 제거 (최신 cdc_ts_ms 유지)
+- **집계 테이블**:
+  - `SummingMergeTree`: 자동 합산으로 증분 데이터 집계 (`product_daily_stats`, `cart_analytics`)
+  - `AggregatingMergeTree`: 집계 함수 state 저장 및 머지 (`customer_segments`, `hourly_sales_by_product`)
+  - ⚠️ `AggregatingMergeTree`는 user_id별 중복 없이 정확한 증분 집계 보장
+- **Active View 레이어**: 쿼리 시점 deleted_at 필터링으로 정확한 통계 제공
 
 ### 중복 데이터 검증
 
 ```bash
-# ClickHouse에서 중복 확인
+# 1. Raw 테이블 중복 확인 (머지 전 임시 중복 가능)
 docker exec -it yeumgw-clickhouse-server clickhouse-client --query \
   "SELECT id, COUNT(*) as count FROM order_analytics.orders_realtime GROUP BY id HAVING count > 1"
 
+# 2. Active View 데이터 정합성 확인
+docker exec -it yeumgw-clickhouse-server clickhouse-client --query \
+  "SELECT COUNT(*) FROM order_analytics.active_orders_realtime"
+
+# 3. 집계 테이블 중복 확인
+# SummingMergeTree (cart_analytics)
+docker exec -it yeumgw-clickhouse-server clickhouse-client --query \
+  "SELECT created_at, COUNT(*) as count FROM order_analytics.cart_analytics GROUP BY created_at HAVING count > 1"
 # 예상 결과: 빈 결과 (중복 없음)
 
-# Flink 중복 제거 로그 확인
+# AggregatingMergeTree (customer_segments) - user_id 중복 확인
+docker exec -it yeumgw-clickhouse-server clickhouse-client --query \
+  "SELECT user_id, COUNT(*) as count FROM order_analytics.customer_segments GROUP BY user_id HAVING count > 1"
+# 예상 결과: 빈 결과 (user_id별 1행만 존재)
+
+# 4. Flink 중복 제거 로그 확인
 docker logs yeumgw-flink-taskmanager 2>&1 | grep "중복 이벤트 필터링"
 ```
 

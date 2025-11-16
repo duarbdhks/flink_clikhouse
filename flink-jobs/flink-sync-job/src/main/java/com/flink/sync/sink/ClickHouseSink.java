@@ -2,6 +2,7 @@ package com.flink.sync.sink;
 
 import com.flink.common.config.ConfigLoader;
 import com.flink.sync.transform.ClickHouseRow;
+import com.flink.sync.transform.OrderItemsRow;
 import org.apache.flink.connector.jdbc.JdbcConnectionOptions;
 import org.apache.flink.connector.jdbc.JdbcExecutionOptions;
 import org.apache.flink.connector.jdbc.JdbcSink;
@@ -94,6 +95,88 @@ public class ClickHouseSink {
                 JdbcExecutionOptions.builder()
                                     .withBatchSize(fastBatchSize)              // application.properties에서 로드
                                     .withBatchIntervalMs(fastBatchIntervalMs)  // application.properties에서 로드
+                                    .withMaxRetries(maxRetries)
+                                    .build(),
+                new JdbcConnectionOptions.JdbcConnectionOptionsBuilder()
+                        .withUrl(CLICKHOUSE_URL)
+                        .withDriverName(CLICKHOUSE_DRIVER)
+                        .withUsername(CLICKHOUSE_USER)
+                        .withPassword(CLICKHOUSE_PASSWORD)
+                        .build()
+        );
+    }
+
+    /**
+     * OrderItems 테이블을 위한 ClickHouse Sink 생성
+     * ReplacingMergeTree(cdc_ts_ms) 엔진 사용:
+     * - cdc_ts_ms를 버전 컬럼으로 사용하여 자동 중복 제거
+     * - 동일 (id, cdc_ts_ms) 조합은 백그라운드 머지에서 제거됨
+     */
+    public static SinkFunction<OrderItemsRow> createOrderItemsSink() {
+        String insertSQL = "INSERT INTO order_items_realtime (id, order_id, product_id, product_name, "
+                + "quantity, price, subtotal, created_at, updated_at, deleted_at, cdc_op, cdc_ts_ms) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        int batchSize = ConfigLoader.getInt("clickhouse.batch.size", 1000);
+        long batchIntervalMs = ConfigLoader.getLong("clickhouse.batch.interval.ms", 5000L);
+        int maxRetries = ConfigLoader.getInt("clickhouse.max.retries", 3);
+
+        return JdbcSink.sink(
+                insertSQL,
+                new OrderItemsStatementBuilder(),
+                JdbcExecutionOptions.builder()
+                                    .withBatchSize(batchSize)
+                                    .withBatchIntervalMs(batchIntervalMs)
+                                    .withMaxRetries(maxRetries)
+                                    .build(),
+                new JdbcConnectionOptions.JdbcConnectionOptionsBuilder()
+                        .withUrl(CLICKHOUSE_URL)
+                        .withDriverName(CLICKHOUSE_DRIVER)
+                        .withUsername(CLICKHOUSE_USER)
+                        .withPassword(CLICKHOUSE_PASSWORD)
+                        .build()
+        );
+    }
+
+    /**
+     * PreparedStatement에 OrderItemsRow 데이터를 바인딩
+     * 멱등성 보장: cdc_ts_ms를 버전으로 사용하여 동일한 이벤트 중복 제거
+     */
+    private static class OrderItemsStatementBuilder implements JdbcStatementBuilder<OrderItemsRow> {
+        @Override
+        public void accept(PreparedStatement ps, OrderItemsRow row) throws SQLException {
+            ps.setLong(1, row.getId());
+            ps.setLong(2, row.getOrderId());
+            ps.setLong(3, row.getProductId());
+            ps.setString(4, row.getProductName());
+            ps.setInt(5, row.getQuantity());
+            ps.setBigDecimal(6, row.getPrice());
+            ps.setBigDecimal(7, row.getSubtotal());
+            ps.setTimestamp(8, row.getCreatedAt());
+            ps.setTimestamp(9, row.getUpdatedAt());
+            ps.setTimestamp(10, row.getDeletedAt()); // Nullable
+            ps.setString(11, row.getCdcOp());
+            ps.setLong(12, row.getCdcTsMs());
+        }
+    }
+
+    /**
+     * 개발/테스트용: OrderItems 작은 배치 크기로 빠른 싱크
+     */
+    public static SinkFunction<OrderItemsRow> createOrderItemsSinkFast() {
+        String insertSQL = "INSERT INTO order_items_realtime (id, order_id, product_id, product_name, "
+                + "quantity, price, subtotal, created_at, updated_at, deleted_at, cdc_op, cdc_ts_ms) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        int fastBatchSize = ConfigLoader.getInt("clickhouse.fast.batch.size", 100);
+        long fastBatchIntervalMs = ConfigLoader.getLong("clickhouse.fast.batch.interval.ms", 1000L);
+        int maxRetries = ConfigLoader.getInt("clickhouse.max.retries", 3);
+
+        return JdbcSink.sink(
+                insertSQL,
+                new OrderItemsStatementBuilder(),
+                JdbcExecutionOptions.builder()
+                                    .withBatchSize(fastBatchSize)
+                                    .withBatchIntervalMs(fastBatchIntervalMs)
                                     .withMaxRetries(maxRetries)
                                     .build(),
                 new JdbcConnectionOptions.JdbcConnectionOptionsBuilder()

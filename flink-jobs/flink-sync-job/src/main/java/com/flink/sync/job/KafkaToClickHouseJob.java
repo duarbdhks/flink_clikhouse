@@ -2,10 +2,14 @@ package com.flink.sync.job;
 
 import com.flink.sync.config.KafkaSourceConfig;
 import com.flink.sync.function.DeduplicationFunction;
+import com.flink.sync.function.OrderItemsDeduplicationFunction;
 import com.flink.sync.sink.ClickHouseSink;
 import com.flink.sync.transform.CDCEventTransformer;
 import com.flink.sync.transform.ClickHouseRow;
+import com.flink.sync.transform.OrderItemsTransformer;
+import com.flink.sync.transform.OrderItemsRow;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.connector.kafka.source.KafkaSource;
@@ -22,7 +26,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * Kafka to ClickHouse Sync Job - Kafka CDC 이벤트를 ClickHouse로 동기화
  * 데이터 흐름:
- * Kafka Topic (orders-cdc) -> Flink CDC Event Transformer -> ClickHouse Sink
+ * 1. Kafka Topic (orders-cdc) -> Flink CDC Event Transformer -> ClickHouse orders_realtime
+ * 2. Kafka Topic (order-items-cdc) -> Flink CDC Event Transformer -> ClickHouse order_items_realtime
  * 실행 방법:
  * flink run -c com.flink.sync.job.KafkaToClickHouseJob flink-sync-job.jar
  */
@@ -43,48 +48,90 @@ public class KafkaToClickHouseJob {
         // 4. 병렬도 설정
         env.setParallelism(2);
 
-        // 5. Kafka Source 생성
-        KafkaSource<String> kafkaSource = KafkaSourceConfig.createOrdersSource();
-        LOG.info("✅ Kafka Source 생성 완료");
+        // ========================================
+        // Pipeline 1: Orders (orders-cdc → orders_realtime)
+        // ========================================
 
-        // 6. Kafka 이벤트 스트림 생성
-        DataStream<String> cdcEventStream = env
-                .fromSource(kafkaSource, WatermarkStrategy.noWatermarks(), "Kafka CDC Source")
-                .uid("kafka-cdc-source")
-                .name("Kafka CDC Event Reader");
+        // 5-1. Orders Kafka Source 생성
+        KafkaSource<String> ordersKafkaSource = KafkaSourceConfig.createOrdersSource();
+        LOG.info("✅ Orders Kafka Source 생성 완료");
 
-        // 7. CDC 이벤트를 ClickHouse Row로 변환
-        DataStream<ClickHouseRow> clickHouseRowStream = cdcEventStream
+        // 6-1. Orders Kafka 이벤트 스트림 생성
+        DataStream<String> ordersCdcEventStream = env
+                .fromSource(ordersKafkaSource, WatermarkStrategy.noWatermarks(), "Kafka CDC Source - Orders")
+                .uid("kafka-cdc-source-orders")
+                .name("Kafka CDC Event Reader - Orders");
+
+        // 7-1. Orders CDC 이벤트를 ClickHouse Row로 변환
+        DataStream<ClickHouseRow> ordersClickHouseRowStream = ordersCdcEventStream
                 .map(new CDCEventTransformer())
-                .uid("cdc-transformer")
-                .name("CDC Event Transformer")
+                .uid("cdc-transformer-orders")
+                .name("CDC Event Transformer - Orders")
                 .filter(Objects::nonNull)  // null 필터링 (변환 실패 이벤트 제외)
-                .uid("filter-null-rows")
-                .name("Filter Null Rows");
+                .uid("filter-null-rows-orders")
+                .name("Filter Null Rows - Orders");
 
-        // 8. 중복 제거 (Deduplication) - ClickHouse 삽입 전 애플리케이션 레벨 필터링
-        DataStream<ClickHouseRow> deduplicatedStream = clickHouseRowStream
-                .keyBy(row -> String.valueOf(row.getId())) // id 사용
-                .process(new DeduplicationFunction(600)) // 600초 (10분) State TTL - Production 표준
-                .uid("deduplication")
-                .name("Deduplication Filter");
+        // 8-1. Orders 중복 제거 (Deduplication)
+        DataStream<ClickHouseRow> ordersDeduplicatedStream = ordersClickHouseRowStream
+                .keyBy(row -> String.valueOf(row.getId()))
+                .process(new DeduplicationFunction(600)) // 600초 (10분) State TTL
+                .uid("deduplication-orders")
+                .name("Deduplication Filter - Orders");
 
-        // 9. ClickHouse Sink 생성 및 데이터 삽입
-        deduplicatedStream
+        // 9-1. Orders ClickHouse Sink
+        ordersDeduplicatedStream
                 .addSink(ClickHouseSink.createOrdersSink())
-                .uid("clickhouse-sink")
+                .uid("clickhouse-sink-orders")
                 .name("ClickHouse Orders Sink");
 
-        LOG.info("✅ ClickHouse Sink 생성 완료 (중복 제거 활성화: State TTL 600초)");
+        LOG.info("✅ Orders Pipeline 생성 완료 (중복 제거 활성화: State TTL 600초)");
+
+        // ========================================
+        // Pipeline 2: OrderItems (order-items-cdc → order_items_realtime)
+        // ========================================
+
+        // 5-2. OrderItems Kafka Source 생성
+        KafkaSource<String> orderItemsKafkaSource = KafkaSourceConfig.createOrderItemsSource();
+        LOG.info("✅ OrderItems Kafka Source 생성 완료");
+
+        // 6-2. OrderItems Kafka 이벤트 스트림 생성
+        DataStream<String> orderItemsCdcEventStream = env
+                .fromSource(orderItemsKafkaSource, WatermarkStrategy.noWatermarks(), "Kafka CDC Source - OrderItems")
+                .uid("kafka-cdc-source-order-items")
+                .name("Kafka CDC Event Reader - OrderItems");
+
+        // 7-2. OrderItems CDC 이벤트를 ClickHouse Row로 변환
+        DataStream<OrderItemsRow> orderItemsClickHouseRowStream = orderItemsCdcEventStream
+                .map(new OrderItemsTransformer())
+                .uid("cdc-transformer-order-items")
+                .name("CDC Event Transformer - OrderItems")
+                .filter(Objects::nonNull)  // null 필터링 (변환 실패 이벤트 제외)
+                .uid("filter-null-rows-order-items")
+                .name("Filter Null Rows - OrderItems");
+
+        // 8-2. OrderItems 중복 제거 (Deduplication)
+        DataStream<OrderItemsRow> orderItemsDeduplicatedStream = orderItemsClickHouseRowStream
+                .keyBy(row -> String.valueOf(row.getId()))
+                .process(new OrderItemsDeduplicationFunction(600)) // 600초 (10분) State TTL
+                .uid("deduplication-order-items")
+                .name("Deduplication Filter - OrderItems");
+
+        // 9-2. OrderItems ClickHouse Sink
+        orderItemsDeduplicatedStream
+                .addSink(ClickHouseSink.createOrderItemsSink())
+                .uid("clickhouse-sink-order-items")
+                .name("ClickHouse OrderItems Sink");
+
+        LOG.info("✅ OrderItems Pipeline 생성 완료 (중복 제거 활성화: State TTL 600초)");
 
         // 10. Job 실행
         LOG.info("🚀 Kafka to ClickHouse Sync Job 시작...");
-        LOG.info("📥 Source: Kafka (orders-cdc)");
-        LOG.info("📤 Sink: ClickHouse (orders_realtime)");
+        LOG.info("📥 Source 1: Kafka (orders-cdc) → ClickHouse (orders_realtime)");
+        LOG.info("📥 Source 2: Kafka (order-items-cdc) → ClickHouse (order_items_realtime)");
         LOG.info("⚙️  Parallelism: {}", env.getParallelism());
         LOG.info("🔄 Batch Size: 1000 rows, Interval: 5 seconds");
 
-        env.execute("Kafka CDC to ClickHouse - Orders Sync");
+        env.execute("Kafka CDC to ClickHouse - Orders + OrderItems Sync");
     }
 
     /**
