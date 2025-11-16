@@ -18,13 +18,13 @@ MySQL 데이터를 실시간으로 ClickHouse에 동기화하는 CDC 기반 데�
 ### 초기 설정
 ```bash
 # 전체 시스템 원스톱 초기화
-bash scripts/setup/init-all.sh
+bash docker/init/setup-all.sh
 
 # 또는 수동 초기화
 docker-compose up -d mysql clickhouse kafka
-docker exec -i mysql mysql -uroot -ptest123 < scripts/sql/init-mysql.sql
-docker exec -i clickhouse clickhouse-client --multiquery < scripts/sql/init-clickhouse.sql
-bash scripts/kafka/create-topics.sh
+docker exec -i mysql mysql -uroot -ptest123 < docker/init/sql/init-mysql.sql
+docker exec -i clickhouse clickhouse-client --multiquery < docker/init/sql/init-clickhouse.sql
+bash docker/init/kafka/create-topics.sh
 ```
 
 ## 프로젝트 구조

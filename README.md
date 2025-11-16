@@ -64,7 +64,7 @@ cd flink_clickhouse
 
 ```bash
 # 모든 서비스 시작 + DB 초기화 + Kafka Topic 생성
-bash scripts/setup/init-all.sh
+bash docker/init/setup-all.sh
 ```
 
 **OR 수동 초기화**:
@@ -74,20 +74,13 @@ bash scripts/setup/init-all.sh
 docker-compose up -d mysql clickhouse kafka
 
 # 2. MySQL 초기화 (users, products, orders, order_items 테이블 + 샘플 데이터)
-# 전체 초기화 (모든 테이블 생성 + 샘플 데이터)
-docker exec -i mysql mysql -uroot -ptest123 < scripts/sql/init-mysql.sql
-
-# 또는 개별 실행
-# docker exec -i mysql mysql -uroot -ptest123 < scripts/sql/01-create-users-table.sql
-# docker exec -i mysql mysql -uroot -ptest123 < scripts/sql/02-create-products-table.sql
-# docker exec -i mysql mysql -uroot -ptest123 < scripts/sql/03-seed-users-data.sql
-# docker exec -i mysql mysql -uroot -ptest123 < scripts/sql/04-seed-products-data.sql
+docker exec -i yeumgw-mysql mysql -uroot -ptest123 < docker/init/sql/init-mysql.sql
 
 # 3. ClickHouse 초기화 (orders_realtime 테이블 + Materialized Views)
-docker exec -i clickhouse clickhouse-client --multiquery < scripts/sql/init-clickhouse.sql
+docker exec -i yeumgw-clickhouse-server clickhouse-client --multiquery < docker/init/sql/init-clickhouse.sql
 
 # 4. Kafka Topics 생성
-bash scripts/kafka/create-topics.sh
+bash docker/init/kafka/create-topics.sh
 ```
 
 ### 4. NestJS API 시작 (Optional)

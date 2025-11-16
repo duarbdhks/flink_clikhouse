@@ -16,7 +16,8 @@ NC='\033[0m' # No Color
 
 # 스크립트 디렉토리 경로
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+DOCKER_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PROJECT_ROOT="$(cd "${DOCKER_DIR}/.." && pwd)"
 
 echo -e "${BLUE}============================================${NC}"
 echo -e "${BLUE}   Flink ClickHouse CDC 파이프라인${NC}"
@@ -60,7 +61,7 @@ echo ""
 
 # 3. MySQL 초기화
 echo -e "${BLUE}[3/5] MySQL 데이터베이스 초기화${NC}"
-docker exec -i yeumgw-mysql mysql -uroot -ptest123 < "${PROJECT_ROOT}/scripts/sql/init-mysql.sql"
+docker exec -i yeumgw-mysql mysql -uroot -ptest123 < "${DOCKER_DIR}/init/sql/init-mysql.sql"
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ MySQL 초기화 완료${NC}"
 else
@@ -71,7 +72,7 @@ echo ""
 
 # 4. ClickHouse 초기화
 echo -e "${BLUE}[4/5] ClickHouse 데이터베이스 초기화${NC}"
-docker exec -i yeumgw-clickhouse-server clickhouse-client --multiquery < "${PROJECT_ROOT}/scripts/sql/init-clickhouse.sql"
+docker exec -i yeumgw-clickhouse-server clickhouse-client --multiquery < "${DOCKER_DIR}/init/sql/init-clickhouse.sql"
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ ClickHouse 초기화 완료${NC}"
 else
@@ -82,7 +83,7 @@ echo ""
 
 # 5. Kafka Topics 생성
 echo -e "${BLUE}[5/5] Kafka Topics 생성${NC}"
-bash "${PROJECT_ROOT}/scripts/kafka/create-topics.sh"
+bash "${DOCKER_DIR}/init/kafka/create-topics.sh"
 echo ""
 
 # 완료 메시지
