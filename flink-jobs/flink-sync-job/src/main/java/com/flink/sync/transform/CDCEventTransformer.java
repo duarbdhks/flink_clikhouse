@@ -9,9 +9,6 @@ import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 /**
@@ -25,21 +22,18 @@ import java.util.Map;
 public class CDCEventTransformer implements MapFunction<String, ClickHouseRow> {
 
     private static final Logger LOG = LoggerFactory.getLogger(CDCEventTransformer.class);
-    private static final ObjectMapper objectMapper;
+    private static final ObjectMapper OBJECT_MAPPER;
 
     static {
-        objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
+        OBJECT_MAPPER = new ObjectMapper();
+        OBJECT_MAPPER.registerModule(new JavaTimeModule());
     }
-
-    private static final DateTimeFormatter DATE_TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
 
     @Override
     public ClickHouseRow map(String cdcEventJson) throws Exception {
         try {
             // JSON 파싱
-            CDCEvent event = objectMapper.readValue(cdcEventJson, CDCEvent.class);
+            CDCEvent event = OBJECT_MAPPER.readValue(cdcEventJson, CDCEvent.class);
 
             // operation 타입에 따라 데이터 선택
             Map<String, Object> data;
@@ -68,6 +62,7 @@ public class CDCEventTransformer implements MapFunction<String, ClickHouseRow> {
             row.setTotalAmount(getBigDecimalValue(data, "total_amount"));
             row.setCreatedAt(getTimestampValue(data, "created_at"));
             row.setUpdatedAt(getTimestampValue(data, "updated_at"));
+            row.setDeletedAt(getTimestampValue(data, "deleted_at")); // Soft Delete 지원
             row.setCdcOp(operation);
             row.setCdcTsMs(event.getTimestampMs());
 

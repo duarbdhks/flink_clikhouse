@@ -27,11 +27,15 @@ public class ClickHouseSink {
 
     /**
      * Orders 테이블을 위한 ClickHouse Sink 생성
-     * ReplacingMergeTree이므로 INSERT만 수행 (UPDATE/DELETE 없음)
-     * ClickHouse가 자동으로 중복 제거 및 최신 버전 유지
+     * ReplacingMergeTree(cdc_ts_ms) 엔진 사용:
+     * - cdc_ts_ms를 버전 컬럼으로 사용하여 자동 중복 제거
+     * - sync_timestamp 제거하여 멱등성 보장
+     * - 동일 (id, cdc_ts_ms) 조합은 백그라운드 머지에서 제거됨
      */
     public static SinkFunction<ClickHouseRow> createOrdersSink() {
-        String insertSQL = "INSERT INTO orders_realtime (id, user_id, status, total_amount, created_at, updated_at, cdc_op, cdc_ts_ms, sync_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())";
+        String insertSQL = "INSERT INTO orders_realtime (id, user_id, status, total_amount, "
+                + "created_at, updated_at, deleted_at, cdc_op, cdc_ts_ms) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         int batchSize = ConfigLoader.getInt("clickhouse.batch.size", 1000);
         long batchIntervalMs = ConfigLoader.getLong("clickhouse.batch.interval.ms", 5000L);
         int maxRetries = ConfigLoader.getInt("clickhouse.max.retries", 3);
@@ -55,6 +59,7 @@ public class ClickHouseSink {
 
     /**
      * PreparedStatement에 ClickHouseRow 데이터를 바인딩
+     * 멱등성 보장: cdc_ts_ms를 버전으로 사용하여 동일한 이벤트 중복 제거
      */
     private static class OrdersStatementBuilder implements JdbcStatementBuilder<ClickHouseRow> {
         @Override
@@ -65,9 +70,9 @@ public class ClickHouseSink {
             ps.setBigDecimal(4, row.getTotalAmount());
             ps.setTimestamp(5, row.getCreatedAt());
             ps.setTimestamp(6, row.getUpdatedAt());
-            ps.setString(7, row.getCdcOp());
-            ps.setLong(8, row.getCdcTsMs());
-            // sync_timestamp는 now()로 자동 설정
+            ps.setTimestamp(7, row.getDeletedAt()); // Nullable
+            ps.setString(8, row.getCdcOp());
+            ps.setLong(9, row.getCdcTsMs());
         }
     }
 
@@ -75,7 +80,9 @@ public class ClickHouseSink {
      * 개발/테스트용: 작은 배치 크기로 빠른 싱크
      */
     public static SinkFunction<ClickHouseRow> createOrdersSinkFast() {
-        String insertSQL = "INSERT INTO orders_realtime (id, user_id, status, total_amount, created_at, updated_at, cdc_op, cdc_ts_ms, sync_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())";
+        String insertSQL = "INSERT INTO orders_realtime (id, user_id, status, total_amount, "
+                + "created_at, updated_at, deleted_at, cdc_op, cdc_ts_ms) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         int fastBatchSize = ConfigLoader.getInt("clickhouse.fast.batch.size", 100);
         long fastBatchIntervalMs = ConfigLoader.getLong("clickhouse.fast.batch.interval.ms", 1000L);

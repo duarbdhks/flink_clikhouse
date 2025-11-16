@@ -29,13 +29,12 @@ CREATE TABLE IF NOT EXISTS orders_realtime (
   updated_at     DateTime64(3) COMMENT '마지막 수정 일시 (밀리초 정밀도)',
   deleted_at     Nullable(DateTime64(3)) COMMENT 'Soft Delete 일시 (NULL=활성)',
   cdc_op         LowCardinality(String) COMMENT 'CDC 작업 타입 (c=create, u=update, d=delete)',
-  cdc_ts_ms      UInt64 COMMENT 'CDC 타임스탬프 (밀리초)',
-  sync_timestamp DateTime DEFAULT now() COMMENT '동기화 타임스탬프'
+  cdc_ts_ms      UInt64 COMMENT 'CDC 타임스탬프 (밀리초) - 버전 관리용'
 )
-  ENGINE = ReplacingMergeTree(updated_at) PARTITION BY toYYYYMM(created_at)
-    ORDER BY (id, user_id, created_at)
+  ENGINE = ReplacingMergeTree(cdc_ts_ms) PARTITION BY toYYYYMM(created_at)
+    ORDER BY (id)
     SETTINGS index_granularity = 8192
-    COMMENT '실시간 주문 데이터 (CDC 동기화)';
+    COMMENT '실시간 주문 데이터 (CDC 동기화) - id 기반 중복 제거, cdc_ts_ms 버전 관리';
 
 -- ============================================
 -- 메인 테이블 2: order_items_realtime
@@ -54,13 +53,12 @@ CREATE TABLE IF NOT EXISTS order_items_realtime (
   updated_at     DateTime64(3) COMMENT '수정 일시 (밀리초 정밀도)',
   deleted_at     Nullable(DateTime64(3)) COMMENT 'Soft Delete 일시 (NULL=활성)',
   cdc_op         LowCardinality(String) COMMENT 'CDC 작업 타입',
-  cdc_ts_ms      UInt64 COMMENT 'CDC 타임스탬프 (밀리초)',
-  sync_timestamp DateTime DEFAULT now() COMMENT 'ClickHouse 동기화 시각'
+  cdc_ts_ms      UInt64 COMMENT 'CDC 타임스탬프 (밀리초) - 버전 관리용'
 )
-  ENGINE = ReplacingMergeTree(updated_at) PARTITION BY toYYYYMM(created_at)
-    ORDER BY (id, order_id, product_id)
+  ENGINE = ReplacingMergeTree(cdc_ts_ms) PARTITION BY toYYYYMM(created_at)
+    ORDER BY (id)
     SETTINGS index_granularity = 8192
-    COMMENT '실시간 주문 항목 데이터';
+    COMMENT '실시간 주문 항목 데이터 - id 기반 중복 제거, cdc_ts_ms 버전 관리';
 
 -- ============================================
 -- Materialized View 1: 상품 일별 통계

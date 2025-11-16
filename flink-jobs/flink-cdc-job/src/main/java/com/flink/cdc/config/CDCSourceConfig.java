@@ -39,10 +39,14 @@ public class CDCSourceConfig {
 
         // Debezium Properties (application.properties에서 로드)
         Properties debeziumProperties = new Properties();
-        debeziumProperties.setProperty("snapshot.mode", ConfigLoader.get("debezium.snapshot.mode", "initial"));
-        debeziumProperties.setProperty("decimal.handling.mode", ConfigLoader.get("debezium.decimal.handling.mode", "string"));
-        debeziumProperties.setProperty("bigint.unsigned.handling.mode", ConfigLoader.get("debezium.bigint.unsigned.handling.mode", "long"));
-        debeziumProperties.setProperty("include.schema.changes", ConfigLoader.get("debezium.include.schema.changes", "false"));
+        debeziumProperties.setProperty("snapshot.mode",
+                                       ConfigLoader.get("debezium.snapshot.mode", "initial"));
+        debeziumProperties.setProperty("decimal.handling.mode",
+                                       ConfigLoader.get("debezium.decimal.handling.mode", "string"));
+        debeziumProperties.setProperty("bigint.unsigned.handling.mode",
+                                       ConfigLoader.get("debezium.bigint.unsigned.handling.mode", "long"));
+        debeziumProperties.setProperty("include.schema.changes",
+                                       ConfigLoader.get("debezium.include.schema.changes", "false"));
 
         return MySqlSource.<String>builder()
                           .hostname(HOSTNAME)

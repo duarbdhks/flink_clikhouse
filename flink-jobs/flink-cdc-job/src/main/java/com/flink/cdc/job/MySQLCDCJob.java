@@ -53,7 +53,9 @@ public class MySQLCDCJob {
                                           .name("MySQL Binlog Reader");
 
         // 7. 테이블별로 라우팅 (orders / order_items)
-        DataStream<String> ordersStream = cdcStream.filter(new TableRouter("orders")).uid("filter-orders").name("Filter Orders Table");
+        DataStream<String> ordersStream = cdcStream.filter(new TableRouter("orders"))
+                .uid("filter-orders")
+                .name("Filter Orders Table");
 
         DataStream<String> orderItemsStream = cdcStream.filter(new TableRouter("order_items"))
                                                        .uid("filter-order-items")
@@ -101,12 +103,18 @@ public class MySQLCDCJob {
         checkpointConfig.setMaxConcurrentCheckpoints(1);
 
         // Job 취소 시에도 Checkpoint 보존 (복구 가능)
-        checkpointConfig.setExternalizedCheckpointCleanup(CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION);
+        checkpointConfig.setExternalizedCheckpointCleanup(
+                CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION);
 
         // 허용 가능한 Checkpoint 실패 횟수: 3회
         checkpointConfig.setTolerableCheckpointFailureNumber(3);
 
-        LOG.info("✅ Checkpoint 설정 완료: interval=60s, mode=EXACTLY_ONCE");
+        // Checkpoint 스토리지 설정: 파일 시스템 기반 (Job 재시작 시 복구 가능)
+        // Docker 볼륨: ./docker/volumes/flink-checkpoints:/tmp/flink-checkpoints
+        // 이 설정이 없으면 in-memory state 사용 → docker restart 시 binlog 위치 손실 → 중복 전송!
+        checkpointConfig.setCheckpointStorage("file:///tmp/flink-checkpoints");
+
+        LOG.info("✅ Checkpoint 설정 완료: interval=60s, mode=EXACTLY_ONCE, storage=file:///tmp/flink-checkpoints");
     }
 
     /**

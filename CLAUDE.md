@@ -156,6 +156,61 @@ docker exec -it yeumgw-clickhouse-server clickhouse-client \
 - **포트 충돌**: 로컬 MySQL/Kafka와 충돌 시 포트 변경 (예: `13306:3306`)
 - **볼륨 초기화**: 데이터 전체 삭제 시 `docker-compose down -v`
 
+## 멱등성 보장 (Idempotency)
+
+이 프로젝트는 **다층 멱등성 보장** 시스템을 구현하여 Flink Job 재시작 시 중복 데이터 발생을 방지합니다.
+
+### ⚠️ 중요: Checkpoint Storage 필수 설정
+
+**CDC Job과 Sync Job 모두 파일 기반 체크포인트 스토리지를 사용해야 합니다!**
+
+- **CDC Job**: `MySQLCDCJob.java:112` - MySQL binlog 위치 저장
+  - 이 설정 없으면 docker restart 시 binlog를 처음부터 다시 읽어 Kafka에 모든 데이터 재전송
+- **Sync Job**: `KafkaToClickHouseJob.java:113` - Kafka offset 저장
+  - 이 설정 없으면 Job restart 시 Kafka 메시지를 처음부터 다시 읽어 ClickHouse에 중복 삽입
+
+```java
+// 두 Job 모두 필수 설정
+checkpointConfig.setCheckpointStorage("file:///tmp/flink-checkpoints");
+```
+
+**Docker 볼륨**: `./docker/volumes/flink-checkpoints:/tmp/flink-checkpoints`
+
+### 멱등성 레이어
+
+**Layer 1: Kafka Offset 관리**
+- CDC Job: MySQL binlog 위치를 checkpoint에 저장하여 재시작 시 정확한 위치부터 재개
+- Sync Job: Kafka offset을 checkpoint에 저장 (Exactly-Once)
+- 파일 시스템 체크포인트 스토리지: `./docker/volumes/flink-checkpoints`
+- Offset Reset Strategy: `LATEST` (재시작 시 과거 메시지 재처리 방지)
+
+**Layer 2: 애플리케이션 레벨 필터링**
+- Flink `DeduplicationFunction`: (id, cdc_ts_ms) 조합으로 중복 필터링
+- State TTL 60초로 메모리 효율성 보장
+- ClickHouse 삽입 전 필터링으로 불필요한 I/O 방지
+
+**Layer 3: ClickHouse 저장소 레벨**
+- `ReplacingMergeTree(cdc_ts_ms)`: CDC 타임스탬프 기반 버전 관리
+- `ORDER BY (id)`: id 기반 중복 그룹화 (cdc_ts_ms는 버전 선택 기준)
+- 백그라운드 머지로 비동기 중복 데이터 제거 (최신 cdc_ts_ms 유지)
+
+### 중복 데이터 검증
+
+```bash
+# ClickHouse에서 중복 확인
+docker exec -it yeumgw-clickhouse-server clickhouse-client --query \
+  "SELECT id, COUNT(*) as count FROM order_analytics.orders_realtime GROUP BY id HAVING count > 1"
+
+# 예상 결과: 빈 결과 (중복 없음)
+
+# Flink 중복 제거 로그 확인
+docker logs yeumgw-flink-taskmanager 2>&1 | grep "중복 이벤트 필터링"
+```
+
+**상세 가이드**: `IDEMPOTENCY_GUIDE.md` 참조
+
+---
+
 ## 트러블슈팅
 
 ### Flink Job 실패
@@ -198,6 +253,7 @@ docker exec -it yeumgw-clickhouse-server clickhouse-client \
 - `pipeline/05-clickhouse-schema.md`: 분석 테이블 설계
 - `infrastructure/deployment-guide.md`: Docker Compose 배포
 - `testing/pipeline-validation.md`: E2E 테스트 가이드
+- **`IDEMPOTENCY_GUIDE.md`: 멱등성 보장 가이드 (중요!)**
 
 ## 성능 목표 (MVP)
 - End-to-End 지연시간: < 5초

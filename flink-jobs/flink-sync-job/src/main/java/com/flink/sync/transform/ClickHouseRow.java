@@ -7,16 +7,16 @@ import java.sql.Timestamp;
 /**
  * ClickHouse orders_realtime 테이블 Row 모델
  *
- * ClickHouse 테이블 스키마:
+ * ClickHouse 테이블 스키마 (멱등성 보장 버전):
  * - id BIGINT
  * - user_id BIGINT
  * - status VARCHAR
  * - total_amount DECIMAL(10,2)
  * - created_at TIMESTAMP
  * - updated_at TIMESTAMP
+ * - deleted_at NULLABLE(TIMESTAMP)
  * - cdc_op VARCHAR(1)
- * - cdc_ts_ms BIGINT
- * - sync_timestamp TIMESTAMP (자동)
+ * - cdc_ts_ms BIGINT (버전 컬럼 - ReplacingMergeTree 중복 제거용)
  */
 public class ClickHouseRow implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -27,6 +27,7 @@ public class ClickHouseRow implements Serializable {
     private BigDecimal totalAmount;
     private Timestamp createdAt;
     private Timestamp updatedAt;
+    private Timestamp deletedAt;  // Soft Delete 지원
     private String cdcOp;
     private Long cdcTsMs;
 
@@ -35,13 +36,15 @@ public class ClickHouseRow implements Serializable {
     }
 
     public ClickHouseRow(Long id, Long userId, String status, BigDecimal totalAmount,
-                         Timestamp createdAt, Timestamp updatedAt, String cdcOp, Long cdcTsMs) {
+                         Timestamp createdAt, Timestamp updatedAt, Timestamp deletedAt,
+                         String cdcOp, Long cdcTsMs) {
         this.id = id;
         this.userId = userId;
         this.status = status;
         this.totalAmount = totalAmount;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.deletedAt = deletedAt;
         this.cdcOp = cdcOp;
         this.cdcTsMs = cdcTsMs;
     }
@@ -93,6 +96,14 @@ public class ClickHouseRow implements Serializable {
 
     public void setUpdatedAt(Timestamp updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Timestamp getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(Timestamp deletedAt) {
+        this.deletedAt = deletedAt;
     }
 
     public String getCdcOp() {

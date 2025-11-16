@@ -3,7 +3,8 @@ package com.flink.cdc.config;
 import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.junit.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
 
 /**
  * KafkaSinkConfig 단위 테스트

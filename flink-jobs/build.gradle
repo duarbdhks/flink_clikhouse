@@ -11,13 +11,15 @@ subprojects {
     apply plugin: 'java'
     apply plugin: 'application'
 
-    sourceCompatibility = '11'
-    targetCompatibility = '11'
+    java {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
 
     repositories {
         mavenCentral()
         maven {
-            url "https://repository.apache.org/content/repositories/snapshots/"
+            setUrl("https://repository.apache.org/content/repositories/snapshots/")
         }
     }
 

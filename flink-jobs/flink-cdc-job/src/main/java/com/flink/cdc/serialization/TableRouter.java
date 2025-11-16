@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 public class TableRouter implements FilterFunction<String> {
 
     private static final Logger LOG = LoggerFactory.getLogger(TableRouter.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final String targetTableName;
 
@@ -39,7 +39,7 @@ public class TableRouter implements FilterFunction<String> {
     public boolean filter(String cdcEvent) throws Exception {
         try {
             // CDC 이벤트 JSON 파싱
-            JsonNode jsonNode = objectMapper.readTree(cdcEvent);
+            JsonNode jsonNode = OBJECT_MAPPER.readTree(cdcEvent);
 
             // source.table 필드에서 테이블 이름 추출
             JsonNode sourceNode = jsonNode.get("source");
@@ -80,7 +80,7 @@ public class TableRouter implements FilterFunction<String> {
      * 특정 operation만 필터링하는 고급 라우터
      */
     public static class OperationTableRouter implements FilterFunction<String> {
-        private static final ObjectMapper objectMapper = new ObjectMapper();
+        private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
         private final String targetTableName;
         private final String targetOperation; // "c", "u", "d", "r"
 
@@ -92,21 +92,29 @@ public class TableRouter implements FilterFunction<String> {
         @Override
         public boolean filter(String cdcEvent) throws Exception {
             try {
-                JsonNode jsonNode = objectMapper.readTree(cdcEvent);
+                JsonNode jsonNode = OBJECT_MAPPER.readTree(cdcEvent);
 
                 // 테이블 이름 확인
                 JsonNode sourceNode = jsonNode.get("source");
-                if (sourceNode == null) return false;
+                if (sourceNode == null) {
+                    return false;
+                }
 
                 JsonNode tableNode = sourceNode.get("table");
-                if (tableNode == null) return false;
+                if (tableNode == null) {
+                    return false;
+                }
 
                 String tableName = tableNode.asText();
-                if (!targetTableName.equals(tableName)) return false;
+                if (!targetTableName.equals(tableName)) {
+                    return false;
+                }
 
                 // Operation 확인
                 JsonNode opNode = jsonNode.get("op");
-                if (opNode == null) return false;
+                if (opNode == null) {
+                    return false;
+                }
 
                 String operation = opNode.asText();
                 return targetOperation.equals(operation);

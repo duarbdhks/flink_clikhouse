@@ -29,16 +29,20 @@ public class KafkaSourceConfig {
      */
     public static KafkaSource<String> createOrdersSource() {
         Properties kafkaProps = new Properties();
-        kafkaProps.setProperty("max.poll.records", ConfigLoader.get("kafka.consumer.max.poll.records", "500"));
-        kafkaProps.setProperty("session.timeout.ms", ConfigLoader.get("kafka.consumer.session.timeout.ms", "30000"));
-        kafkaProps.setProperty("enable.auto.commit", ConfigLoader.get("kafka.consumer.enable.auto.commit", "false")); // Flink가 offset 관리
+        kafkaProps.setProperty("max.poll.records",
+                ConfigLoader.get("kafka.consumer.max.poll.records", "500"));
+        kafkaProps.setProperty("session.timeout.ms",
+                ConfigLoader.get("kafka.consumer.session.timeout.ms", "30000"));
+        kafkaProps.setProperty("enable.auto.commit",
+                ConfigLoader.get("kafka.consumer.enable.auto.commit", "false")); // Flink가 offset 관리
 
         return KafkaSource.<String>builder()
                           .setBootstrapServers(KAFKA_BROKERS)
                           .setTopics(ORDERS_TOPIC)
                           .setGroupId(CONSUMER_GROUP)
-                          // 첫 실행: earliest (모든 메시지), 재시작: committed offset
-                          .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
+                          // 첫 실행: latest (최신 메시지부터), 재시작: committed offset
+                          // LATEST로 변경하여 Job 재시작 시 중복 처리 방지
+                          .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.LATEST))
                           .setValueOnlyDeserializer(new SimpleStringSchema())
                           .setProperties(kafkaProps)
                           .build();
@@ -59,7 +63,8 @@ public class KafkaSourceConfig {
                           .setBootstrapServers(KAFKA_BROKERS)
                           .setTopics(ORDER_ITEMS_TOPIC)
                           .setGroupId(CONSUMER_GROUP + "-items")
-                          .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
+                          // 첫 실행: latest (최신 메시지부터), 재시작: committed offset
+                          .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.LATEST))
                           .setValueOnlyDeserializer(new SimpleStringSchema())
                           .setProperties(kafkaProps)
                           .build();

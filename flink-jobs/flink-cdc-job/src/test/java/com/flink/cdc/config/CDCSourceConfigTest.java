@@ -3,7 +3,8 @@ package com.flink.cdc.config;
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import org.junit.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
 
 /**
  * CDCSourceConfig 단위 테스트

@@ -1,6 +1,7 @@
 package com.flink.sync.job;
 
 import com.flink.sync.config.KafkaSourceConfig;
+import com.flink.sync.function.DeduplicationFunction;
 import com.flink.sync.sink.ClickHouseSink;
 import com.flink.sync.transform.CDCEventTransformer;
 import com.flink.sync.transform.ClickHouseRow;
@@ -61,15 +62,22 @@ public class KafkaToClickHouseJob {
                 .uid("filter-null-rows")
                 .name("Filter Null Rows");
 
-        // 8. ClickHouse Sink 생성 및 데이터 삽입
-        clickHouseRowStream
+        // 8. 중복 제거 (Deduplication) - ClickHouse 삽입 전 애플리케이션 레벨 필터링
+        DataStream<ClickHouseRow> deduplicatedStream = clickHouseRowStream
+                .keyBy(row -> row.getId() + "_" + row.getCdcTsMs()) // (id, cdc_ts_ms) 조합으로 그룹화
+                .process(new DeduplicationFunction(60)) // 60초 State TTL
+                .uid("deduplication")
+                .name("Deduplication Filter");
+
+        // 9. ClickHouse Sink 생성 및 데이터 삽입
+        deduplicatedStream
                 .addSink(ClickHouseSink.createOrdersSink())
                 .uid("clickhouse-sink")
                 .name("ClickHouse Orders Sink");
 
-        LOG.info("✅ ClickHouse Sink 생성 완료");
+        LOG.info("✅ ClickHouse Sink 생성 완료 (중복 제거 활성화)");
 
-        // 9. Job 실행
+        // 10. Job 실행
         LOG.info("🚀 Kafka to ClickHouse Sync Job 시작...");
         LOG.info("📥 Source: Kafka (orders-cdc)");
         LOG.info("📤 Sink: ClickHouse (orders_realtime)");
@@ -108,7 +116,11 @@ public class KafkaToClickHouseJob {
         // 허용 가능한 Checkpoint 실패 횟수: 3회
         checkpointConfig.setTolerableCheckpointFailureNumber(3);
 
-        LOG.info("✅ Checkpoint 설정 완료: interval=60s, mode=EXACTLY_ONCE");
+        // Checkpoint 스토리지 설정: 파일 시스템 기반 (Job 재시작 시 복구 가능)
+        // Docker 볼륨: ./docker/volumes/flink-checkpoints:/tmp/flink-checkpoints
+        checkpointConfig.setCheckpointStorage("file:///tmp/flink-checkpoints");
+
+        LOG.info("✅ Checkpoint 설정 완료: interval=60s, mode=EXACTLY_ONCE, storage=file:///tmp/flink-checkpoints");
     }
 
     /**
