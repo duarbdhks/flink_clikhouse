@@ -199,6 +199,24 @@ services:
     scale: 1  # TaskManager 개수 (필요 시 증가)
 
   # ========================================
+  # Flink Job Auto Submitter
+  # ========================================
+  flink-job-submitter:
+    image: flink:1.18.0-scala_2.12-java11
+    container_name: yeumgw-flink-job-submitter
+    hostname: flink-job-submitter
+    depends_on:
+      flink-jobmanager:
+        condition: service_healthy
+    volumes:
+      - ./flink-jobs:/opt/flink/jobs
+      - ./scripts/flink/submit-jobs.sh:/submit-jobs.sh
+    command: bash /submit-jobs.sh
+    networks:
+      - cdc-network
+    restart: "no"  # 한 번만 실행 후 종료
+
+  # ========================================
   # Kafka UI (Optional - 모니터링용)
   # ========================================
   kafka-ui:
