@@ -25,7 +25,7 @@ public class KafkaSourceConfig {
     /**
      * Orders CDC 이벤트를 위한 Kafka Source 생성
      *
-     * @return KafkaSource<String> - orders-cdc-topic에서 읽는 소스
+     * @return KafkaSource<String> - orders-cdc에서 읽는 소스
      */
     public static KafkaSource<String> createOrdersSource() {
         Properties kafkaProps = new Properties();
@@ -47,7 +47,7 @@ public class KafkaSourceConfig {
     /**
      * Order Items CDC 이벤트를 위한 Kafka Source 생성
      *
-     * @return KafkaSource<String> - order-items-cdc-topic에서 읽는 소스
+     * @return KafkaSource<String> - order-items-cdc에서 읽는 소스
      */
     public static KafkaSource<String> createOrderItemsSource() {
         Properties kafkaProps = new Properties();

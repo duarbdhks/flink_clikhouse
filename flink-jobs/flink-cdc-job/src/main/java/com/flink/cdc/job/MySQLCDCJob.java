@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  * MySQL CDC Job - MySQL binlog 변경사항을 Kafka로 전송
  * <p>
  * 데이터 흐름:
- * MySQL binlog -> Flink CDC Source -> Kafka Sink -> orders-cdc-topic / order-items-cdc-topic
+ * MySQL binlog -> Flink CDC Source -> Kafka Sink -> orders-cdc / order-items-cdc
  * <p>
  * 실행 방법:
  * flink run -c com.flink.cdc.job.MySQLCDCJob flink-cdc-job.jar
@@ -73,7 +73,7 @@ public class MySQLCDCJob {
         // 11. Job 실행
         LOG.info("🚀 MySQL CDC Job 시작...");
         LOG.info("📊 Source: MySQL (order_db.orders, order_db.order_items)");
-        LOG.info("📤 Sink: Kafka (orders-cdc-topic, order-items-cdc-topic)");
+        LOG.info("📤 Sink: Kafka (orders-cdc, order-items-cdc)");
         LOG.info("⚙️  Parallelism: {}", env.getParallelism());
 
         env.execute("MySQL CDC to Kafka - Orders & Order Items");

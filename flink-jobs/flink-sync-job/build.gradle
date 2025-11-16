@@ -48,4 +48,9 @@ shadowJar {
     }
 
     mergeServiceFiles()
+
+    // common 모듈 포함 보장
+    from {
+        project(':common').sourceSets.main.output
+    }
 }

@@ -11,7 +11,7 @@ MySQL (binlog enabled)
     ↓
 Flink CDC Connector 3.0.1 (Debezium 기반)
     ↓
-Kafka Topic (orders-cdc-topic)
+Kafka Topic (orders-cdc)
 ```
 
 ## 📦 필요한 의존성
@@ -226,8 +226,8 @@ public class CDCConfig {
     public static final String KAFKA_BOOTSTRAP_SERVERS = System.getenv().getOrDefault(
         "KAFKA_BOOTSTRAP_SERVERS", "kafka:9092"
     );
-    public static final String KAFKA_TOPIC_ORDERS = "orders-cdc-topic";
-    public static final String KAFKA_TOPIC_ORDER_ITEMS = "order-items-cdc-topic";
+    public static final String KAFKA_TOPIC_ORDERS = "orders-cdc";
+    public static final String KAFKA_TOPIC_ORDER_ITEMS = "order-items-cdc";
 
     // Checkpoint 설정
     public static final long CHECKPOINT_INTERVAL = 60000L; // 1분
@@ -369,7 +369,7 @@ public class MySQLCDCJobSimple {
             .setBootstrapServers("kafka:9092")
             .setRecordSerializer(
                 KafkaRecordSerializationSchema.builder()
-                    .setTopic("orders-cdc-topic")
+                    .setTopic("orders-cdc")
                     .setValueSerializationSchema(new SimpleStringSchema())
                     .build()
             )
@@ -450,7 +450,7 @@ kafka-topics --bootstrap-server localhost:9092 --list
 
 # CDC 이벤트 확인
 kafka-console-consumer --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --from-beginning \
   --max-messages 10
 ```
@@ -516,7 +516,7 @@ VALUES (LAST_INSERT_ID(), 1001, 'Test Product', 5, 100.00, 500.00);
 ### 2. Kafka에서 이벤트 확인
 ```bash
 kafka-console-consumer --bootstrap-server kafka:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --from-beginning
 ```
 

@@ -30,11 +30,11 @@ docker-compose ps
 
 ### 2. Kafka Topic 생성
 ```bash
-# Topic 생성
+# Topic 생성 (순서 보장을 위해 파티션 1개)
 docker exec -it kafka kafka-topics --create \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
-  --partitions 3 \
+  --topic orders-cdc \
+  --partitions 1 \
   --replication-factor 1
 
 # Topic 확인
@@ -77,7 +77,7 @@ docker exec -it mysql mysql -u root -ptest123 order_db \
 sleep 2
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --max-messages 1 \
   --timeout-ms 5000
 
@@ -336,11 +336,9 @@ docker exec -it kafka kafka-consumer-groups --describe \
   --bootstrap-server localhost:9092 \
   --group flink-sync-connector
 
-# 출력 예시:
+# 출력 예시 (파티션 1개로 순서 보장):
 # TOPIC              PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG
-# orders-cdc-topic   0          1500            1500            0
-# orders-cdc-topic   1          1500            1500            0
-# orders-cdc-topic   2          1500            1500            0
+# orders-cdc         0          1500            1500            0
 
 # ✅ LAG = 0 (이상적)
 # ⚠️ LAG > 100 (처리 지연)
@@ -416,7 +414,7 @@ docker exec -it flink-jobmanager flink list
 # 2. Kafka Topic 메시지 확인
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --from-beginning \
   --max-messages 1
 

@@ -217,7 +217,7 @@ docker exec -it clickhouse-server clickhouse-client
 # Kafka Console Consumer
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --from-beginning
 ```
 
@@ -245,7 +245,7 @@ docker exec -it mysql mysql -u root -ptest123 order_db \
 # 2. Kafka 확인 (2초 후)
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --max-messages 1
 
 # 3. ClickHouse 확인 (5초 후)

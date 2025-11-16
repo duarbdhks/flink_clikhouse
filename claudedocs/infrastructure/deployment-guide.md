@@ -174,14 +174,14 @@ sleep 10
 # Topic 생성
 docker exec -it kafka kafka-topics --create \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --partitions 3 \
   --replication-factor 1 \
   --config retention.ms=604800000
 
 docker exec -it kafka kafka-topics --create \
   --bootstrap-server localhost:9092 \
-  --topic order-items-cdc-topic \
+  --topic order-items-cdc \
   --partitions 3 \
   --replication-factor 1 \
   --config retention.ms=604800000
@@ -285,7 +285,7 @@ SELECT * FROM orders LIMIT 5;
 ```bash
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --from-beginning \
   --max-messages 5
 ```
@@ -308,7 +308,7 @@ docker exec -it mysql mysql -u root -p order_db \
 # 2. Kafka에서 CDC 이벤트 확인 (1-2초 후)
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --max-messages 1
 
 # 3. ClickHouse에서 데이터 확인 (3-7초 후)

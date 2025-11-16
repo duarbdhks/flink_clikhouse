@@ -10,7 +10,7 @@ MySQL binlog → Flink CDC Source → Table Router → Kafka Sink
                                    ↓
                           orders / order_items
                                    ↓
-                    orders-cdc-topic / order-items-cdc-topic
+                    orders-cdc / order-items-cdc
 ```
 
 **주요 기능:**
@@ -111,8 +111,8 @@ mysql.password=password
 
 # Kafka 연결 정보
 kafka.bootstrap.servers=kafka:9092
-kafka.topic.orders=orders-cdc-topic
-kafka.topic.order.items=order-items-cdc-topic
+kafka.topic.orders=orders-cdc
+kafka.topic.order.items=order-items-cdc
 
 # Flink Job 설정
 flink.parallelism=2

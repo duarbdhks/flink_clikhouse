@@ -1,5 +1,6 @@
 package com.flink.cdc.config;
 
+import com.flink.common.config.ConfigLoader;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
@@ -13,14 +14,14 @@ import java.util.Properties;
  */
 public class KafkaSinkConfig {
 
-    private static final String KAFKA_BROKERS = "kafka:9092";
-    private static final String ORDERS_TOPIC = "orders-cdc-topic";
-    private static final String ORDER_ITEMS_TOPIC = "order-items-cdc-topic";
+    private static final String KAFKA_BROKERS = ConfigLoader.get("kafka.bootstrap.servers");
+    private static final String ORDERS_TOPIC = ConfigLoader.get("kafka.topic.orders");
+    private static final String ORDER_ITEMS_TOPIC = ConfigLoader.get("kafka.topic.order.items");
 
     /**
      * Orders CDC 이벤트를 위한 Kafka Sink 생성
      *
-     * @return KafkaSink<String> - orders-cdc-topic으로 전송하는 Sink
+     * @return KafkaSink<String> - orders-cdc으로 전송하는 Sink
      */
     public static KafkaSink<String> createOrdersSink() {
         Properties kafkaProps = new Properties();
@@ -44,7 +45,7 @@ public class KafkaSinkConfig {
     /**
      * Order Items CDC 이벤트를 위한 Kafka Sink 생성
      *
-     * @return KafkaSink<String> - order-items-cdc-topic으로 전송하는 Sink
+     * @return KafkaSink<String> - order-items-cdc으로 전송하는 Sink
      */
     public static KafkaSink<String> createOrderItemsSink() {
         Properties kafkaProps = new Properties();
@@ -68,7 +69,7 @@ public class KafkaSinkConfig {
      * 통합 CDC 이벤트를 위한 Kafka Sink 생성 (단일 토픽)
      * 테이블 구분은 CDC 이벤트의 source.table 필드로 수행
      *
-     * @return KafkaSink<String> - orders-cdc-topic으로 전송하는 Sink
+     * @return KafkaSink<String> - orders-cdc으로 전송하는 Sink
      */
     public static KafkaSink<String> createUnifiedSink() {
         Properties kafkaProps = new Properties();

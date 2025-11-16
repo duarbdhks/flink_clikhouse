@@ -14,8 +14,8 @@ Zookeeper 없이 KRaft 모드로 Confluent Kafka를 구성하여 CDC 이벤트 �
 ```mermaid
 graph TB
     FlinkCDC[Flink CDC Job] -->|Change Events| Kafka[Kafka Broker<br/>KRaft Mode]
-    Kafka -->|orders-cdc-topic| FlinkSync[Flink Sync Connector]
-    Kafka -->|order-items-cdc-topic| FlinkSync
+    Kafka -->|orders-cdc| FlinkSync[Flink Sync Connector]
+    Kafka -->|order-items-cdc| FlinkSync
 
     Kafka -->|Metadata Storage| KRaftLog[KRaft Log<br/>Internal Topic]
 
@@ -96,9 +96,9 @@ docker run --rm confluentinc/cp-kafka:7.6.0 kafka-storage random-uuid
 
 ## 📌 Topic 설계
 
-### 1. orders-cdc-topic
+### 1. orders-cdc
 ```yaml
-Topic Name: orders-cdc-topic
+Topic Name: orders-cdc
 Purpose: orders 테이블 CDC 이벤트 스트림
 Partitions: 1  # CDC 순서 보장을 위해 1개로 설정
 Replication Factor: 1 (단일 브로커)
@@ -106,9 +106,9 @@ Retention: 7 days
 Cleanup Policy: delete
 ```
 
-### 2. order-items-cdc-topic
+### 2. order-items-cdc
 ```yaml
-Topic Name: order-items-cdc-topic
+Topic Name: order-items-cdc
 Purpose: order_items 테이블 CDC 이벤트 스트림
 Partitions: 1  # CDC 순서 보장을 위해 1개로 설정
 Replication Factor: 1
@@ -138,8 +138,8 @@ create_topic() {
 }
 
 # CDC Topics 생성 (CDC 순서 보장을 위해 파티션 1개)
-create_topic "orders-cdc-topic" 1 604800000       # 7일 (7 * 24 * 60 * 60 * 1000)
-create_topic "order-items-cdc-topic" 1 604800000  # 7일
+create_topic "orders-cdc" 1 604800000       # 7일 (7 * 24 * 60 * 60 * 1000)
+create_topic "order-items-cdc" 1 604800000  # 7일
 
 # Topic 목록 확인
 docker exec -it kafka kafka-topics --list --bootstrap-server localhost:9092
@@ -155,18 +155,18 @@ docker exec -it kafka kafka-topics --list --bootstrap-server localhost:9092
 # 2. Topic 상세 정보
 docker exec -it kafka kafka-topics --describe \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic
+  --topic orders-cdc
 
 # 3. Topic 삭제
 docker exec -it kafka kafka-topics --delete \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic
+  --topic orders-cdc
 
 # 4. Topic 설정 변경 (retention 기간)
 docker exec -it kafka kafka-configs --alter \
   --bootstrap-server localhost:9092 \
   --entity-type topics \
-  --entity-name orders-cdc-topic \
+  --entity-name orders-cdc \
   --add-config retention.ms=1209600000  # 14일
 ```
 
@@ -175,7 +175,7 @@ docker exec -it kafka kafka-configs --alter \
 # 콘솔 프로듀서로 테스트 메시지 전송
 docker exec -it kafka kafka-console-producer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic
+  --topic orders-cdc
 
 # 입력 (Ctrl+D로 종료):
 # {"order_id": 1, "user_id": 100, "product_name": "Test", "quantity": 1}
@@ -186,25 +186,25 @@ docker exec -it kafka kafka-console-producer \
 # 1. 처음부터 모든 메시지 읽기
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --from-beginning
 
 # 2. 최신 메시지만 읽기
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic
+  --topic orders-cdc
 
 # 3. Consumer Group으로 읽기
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --group flink-sync-consumer \
   --from-beginning
 
 # 4. 특정 개수만 읽기
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --from-beginning \
   --max-messages 10
 ```
@@ -224,7 +224,7 @@ docker exec -it kafka kafka-consumer-groups --describe \
 docker exec -it kafka kafka-consumer-groups --reset-offsets \
   --bootstrap-server localhost:9092 \
   --group flink-sync-consumer \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --to-earliest \
   --execute
 ```
@@ -457,7 +457,7 @@ VALUES (100, 'Test Product', 1, 50.00);
 # 2. Kafka Topic에서 CDC 이벤트 확인
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --from-beginning
 
 # 3. Consumer Lag 확인
@@ -516,7 +516,7 @@ KAFKA_ACKS: all  # 모든 Replica 확인
 # Replication Factor 확인
 docker exec -it kafka kafka-topics --describe \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic
+  --topic orders-cdc
 
 # min.insync.replicas 설정 (프로덕션)
 KAFKA_MIN_INSYNC_REPLICAS: 2

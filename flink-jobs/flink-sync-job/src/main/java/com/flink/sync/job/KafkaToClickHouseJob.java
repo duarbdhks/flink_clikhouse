@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Kafka to ClickHouse Sync Job - Kafka CDC 이벤트를 ClickHouse로 동기화
  * 데이터 흐름:
- * Kafka Topic (orders-cdc-topic) -> Flink CDC Event Transformer -> ClickHouse Sink
+ * Kafka Topic (orders-cdc) -> Flink CDC Event Transformer -> ClickHouse Sink
  * 실행 방법:
  * flink run -c com.flink.sync.job.KafkaToClickHouseJob flink-sync-job.jar
  */
@@ -71,7 +71,7 @@ public class KafkaToClickHouseJob {
 
         // 9. Job 실행
         LOG.info("🚀 Kafka to ClickHouse Sync Job 시작...");
-        LOG.info("📥 Source: Kafka (orders-cdc-topic)");
+        LOG.info("📥 Source: Kafka (orders-cdc)");
         LOG.info("📤 Sink: ClickHouse (orders_realtime)");
         LOG.info("⚙️  Parallelism: {}", env.getParallelism());
         LOG.info("🔄 Batch Size: 1000 rows, Interval: 5 seconds");

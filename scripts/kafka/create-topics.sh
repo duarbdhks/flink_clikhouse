@@ -34,8 +34,8 @@ echo ""
 
 # Topic 설정
 TOPICS=(
-    "orders-cdc-topic"
-    "order-items-cdc-topic"
+    "orders-cdc"
+    "order-items-cdc"
 )
 
 PARTITIONS=1  # CDC 순서 보장을 위해 1개로 설정
@@ -120,5 +120,5 @@ echo ""
 echo -e "${BLUE}💡 유용한 Kafka 명령어:${NC}"
 echo -e "  - Topics 목록: docker exec kafka kafka-topics --bootstrap-server localhost:9092 --list"
 echo -e "  - Consumer Lag 확인: docker exec kafka kafka-consumer-groups --bootstrap-server localhost:9092 --describe --group [group-id]"
-echo -e "  - 메시지 소비 테스트: docker exec kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic orders-cdc-topic --from-beginning"
+echo -e "  - 메시지 소비 테스트: docker exec kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic orders-cdc --from-beginning"
 echo ""

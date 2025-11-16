@@ -48,7 +48,7 @@ MySQL Binlog Monitoring (Flink CDC)
     ↓
 Change Event 감지 (INSERT/UPDATE/DELETE)
     ↓
-Kafka Topic으로 전송 (orders-cdc-topic)
+Kafka Topic으로 전송 (orders-cdc)
 ```
 
 **Change Event 구조 (예시)**:
@@ -71,7 +71,7 @@ Kafka Topic으로 전송 (orders-cdc-topic)
 
 ### Phase 3: 메시지 큐잉 (Kafka)
 ```
-Kafka Topic: orders-cdc-topic
+Kafka Topic: orders-cdc
     ↓
 Partitions: 3 (확장성 고려)
     ↓
@@ -130,7 +130,7 @@ ClickHouse Query
   - Zookeeper 불필요 (KRaft 메타데이터 관리)
   - 경량화된 구성
   - 빠른 시작 시간
-- **Topic**: `orders-cdc-topic`, `order-items-cdc-topic`
+- **Topic**: `orders-cdc`, `order-items-cdc`
 
 ### 4. Apache Flink Sync Connector Job
 - **역할**: Kafka → ClickHouse 실시간 동기화

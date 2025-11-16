@@ -5,7 +5,7 @@ Kafka에서 CDC 이벤트를 소비하여 ClickHouse로 실시간 동기화하�
 
 ## 🎯 데이터 흐름
 ```
-Kafka Topic (orders-cdc-topic)
+Kafka Topic (orders-cdc)
     ↓
 Flink Kafka Consumer
     ↓
@@ -185,7 +185,7 @@ public class SyncConfig {
     // Kafka 설정
     public static final String KAFKA_BOOTSTRAP_SERVERS = System.getenv()
         .getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092");
-    public static final String KAFKA_TOPIC_ORDERS = "orders-cdc-topic";
+    public static final String KAFKA_TOPIC_ORDERS = "orders-cdc";
     public static final String KAFKA_GROUP_ID = "flink-sync-connector";
 
     // ClickHouse 설정
@@ -428,7 +428,7 @@ public class KafkaToClickHouseJobSimple {
         // Kafka Source
         KafkaSource<String> kafkaSource = KafkaSource.<String>builder()
             .setBootstrapServers("kafka:9092")
-            .setTopics("orders-cdc-topic")
+            .setTopics("orders-cdc")
             .setGroupId("flink-sync-connector")
             .setValueOnlyDeserializer(new SimpleStringSchema())
             .build();
@@ -588,9 +588,9 @@ docker exec -it kafka kafka-consumer-groups --describe \
 
 # 출력 예시:
 # TOPIC              PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG
-# orders-cdc-topic   0          1500            1500            0
-# orders-cdc-topic   1          1500            1500            0
-# orders-cdc-topic   2          1500            1500            0
+# orders-cdc   0          1500            1500            0
+# orders-cdc   1          1500            1500            0
+# orders-cdc   2          1500            1500            0
 ```
 
 ### ClickHouse 데이터 확인
@@ -622,7 +622,7 @@ VALUES (100, 'Test Product', 1, 50.00, 'pending');
 # 2. Kafka Topic 확인 (1-2초 후)
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic orders-cdc-topic \
+  --topic orders-cdc \
   --max-messages 1
 
 # 3. ClickHouse 확인 (3-7초 후)
